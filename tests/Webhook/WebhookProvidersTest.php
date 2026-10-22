@@ -80,19 +80,34 @@ class WebhookProvidersTest extends TestCase
     #[DataProvider('githubLiveDeliveryProvider')]
     public function testGithubLiveDelivery(string $name, int $status, string $content, ?string $tag): void
     {
-        $body = $this->fixture("github-live/$name.body");
-        $headers = json_decode($this->fixture("github-live/$name.headers.json"), true);
-        $configured = 'https://github.com/FivePaths/satisfy.git';
-        $webhook = new GithubWebhook($this->manager([$configured])->reveal(), $this->dispatcher());
+        $webhook = new GithubWebhook($this->manager(['https://github.com/FivePaths/satisfy.git'])->reveal(), $this->dispatcher());
         $webhook->setSecret('github-live-fixture');
 
-        $response = $webhook->getResponse($this->request($body, $headers));
+        $this->assertLiveDelivery($webhook, "github-live/$name", 'https://github.com/FivePaths/satisfy.git', $status, $content, $tag);
+    }
 
-        $this->assertSame($status, $response->getStatusCode());
-        $this->assertSame($content, $response->getContent());
-        $this->assertSame(202 === $status ? [$configured] : [], $this->built);
-        $this->assertSame('github', $this->received[0]->getProvider());
-        $this->assertSame($tag, $this->received[0]->getCreatedTag());
+    public static function giteaLiveDeliveryProvider(): \Generator
+    {
+        yield 'push to a branch' => ['push-branch', null];
+        yield 'tag pushed' => ['push-tag', 'v1.0.0'];
+        yield 'tag pushed, form-encoded' => ['push-tag-form', 'v1.0.0'];
+        yield 'tag created' => ['create-tag', null];
+        yield 'tag deleted' => ['delete-tag', null];
+    }
+
+    /**
+     * Deliveries Gitea 1.27.3 made on 22 October 2026, from a local instance
+     * whose ROOT_URL is http://gitea.example.test:3000/, to webhooks with the
+     * secret "gitea-live-fixture". Unchanged: body and headers as sent.
+     */
+    #[DataProvider('giteaLiveDeliveryProvider')]
+    public function testGiteaLiveDelivery(string $name, ?string $tag): void
+    {
+        $configured = 'http://gitea.example.test:3000/fixture/widget.git';
+        $webhook = new GiteaWebhook($this->manager([$configured])->reveal(), $this->dispatcher());
+        $webhook->setSecret('gitea-live-fixture');
+
+        $this->assertLiveDelivery($webhook, "gitea-live/$name", $configured, 202, 'queued', $tag);
     }
 
     public function testGithubFormEncodedDeliveryIsQueued(): void
@@ -319,6 +334,20 @@ class WebhookProvidersTest extends TestCase
         $event = new WebhookReceivedEvent('devops', Request::create('/'), $payload);
 
         $this->assertSame('v1.2.0', $event->getCreatedTag());
+    }
+
+    private function assertLiveDelivery(AbstractWebhook $webhook, string $fixture, string $configured, int $status, string $content, ?string $tag): void
+    {
+        $body = $this->fixture("$fixture.body");
+        $headers = json_decode($this->fixture("$fixture.headers.json"), true);
+
+        $response = $webhook->getResponse($this->request($body, $headers));
+
+        $this->assertSame($status, $response->getStatusCode());
+        $this->assertSame($content, $response->getContent());
+        $this->assertSame(202 === $status ? [$configured] : [], $this->built);
+        $this->assertSame($webhook->getProvider(), $this->received[0]->getProvider());
+        $this->assertSame($tag, $this->received[0]->getCreatedTag());
     }
 
     private function github(array $configured): GithubWebhook

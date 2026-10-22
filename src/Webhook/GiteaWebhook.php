@@ -13,7 +13,12 @@ class GiteaWebhook extends GithubWebhook
         }
 
         if ($request->headers->has('X-Gitea-Signature')) {
-            $this->verifySignature($request, 'X-Gitea-Signature', '');
+            // Gitea signs the JSON, which a form-encoded delivery carries in
+            // its "payload" field, not the body it sends.
+            $signed = str_starts_with((string) $request->headers->get('Content-Type'), 'application/x-www-form-urlencoded')
+                ? (string) $request->request->get('payload')
+                : null;
+            $this->verifySignature($request, 'X-Gitea-Signature', '', $signed);
 
             return;
         }

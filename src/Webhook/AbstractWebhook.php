@@ -143,14 +143,14 @@ abstract class AbstractWebhook
     }
 
     /**
-     * Checks the HMAC-SHA256 of the raw body that GitHub, Gitea and Bitbucket
-     * Cloud send in $header, after $prefix.
+     * Checks the HMAC-SHA256 that GitHub, Gitea and Bitbucket Cloud send in
+     * $header, after $prefix: of $signed, or of the raw body.
      *
      * @throws \InvalidArgumentException
      */
-    protected function verifySignature(Request $request, string $header, string $prefix = 'sha256='): void
+    protected function verifySignature(Request $request, string $header, string $prefix = 'sha256=', ?string $signed = null): void
     {
-        $expected = $prefix . hash_hmac('sha256', $request->getContent(), (string) $this->secret);
+        $expected = $prefix . hash_hmac('sha256', $signed ?? $request->getContent(), (string) $this->secret);
         if (!hash_equals($expected, (string) $request->headers->get($header))) {
             throw new \InvalidArgumentException(sprintf('Invalid %s signature', $header));
         }
