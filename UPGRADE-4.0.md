@@ -76,7 +76,7 @@ A 3.x deployment that mounted its own `config/config.yml` has to move those over
 
 ## The GitHub, Gitea, Bitbucket and Azure DevOps webhooks
 
-Each was checked against the deliveries its provider documents; `tests/Webhook/WebhookProvidersTest.php` replays them.
+Each was checked against the deliveries its provider documents, and GitHub's also against real deliveries from a repository webhook, JSON and form-encoded; `tests/Webhook/WebhookProvidersTest.php` replays them all.
 
 - GitHub and Gitea answer as the others do: `202 queued`. 3.x answered `200 OK` and then built while the connection closed. Their deliveries now pass through `WebhookReceivedEvent` and `RepositoryAddingEvent` like the rest.
 - GitHub's `ping`, sent when a webhook is created, is answered `200 skipped: ping` without looking for a repository. An organisation's webhook names none, so 3.x answered its ping 400.

@@ -62,6 +62,39 @@ class WebhookProvidersTest extends TestCase
         $this->assertSame('v1.2.0', $this->received[0]->getCreatedTag());
     }
 
+    public static function githubLiveDeliveryProvider(): \Generator
+    {
+        yield 'ping' => ['ping', 200, 'skipped: ping', null];
+        yield 'push to a branch' => ['push-branch', 202, 'queued', null];
+        yield 'tag pushed' => ['push-tag', 202, 'queued', 'webhook-fixture'];
+        yield 'tag pushed, form-encoded' => ['push-tag-form', 202, 'queued', 'webhook-fixture'];
+        yield 'tag deleted, form-encoded' => ['delete-tag-form', 202, 'queued', null];
+    }
+
+    /**
+     * Deliveries GitHub made from repository webhooks on FivePaths/satisfy on
+     * 22 October 2026, each checked against GitHub's X-Hub-Signature-256 as
+     * sent. The pusher's email address was then redacted and the deliveries
+     * signed again with the fixture secret, "github-live-fixture".
+     */
+    #[DataProvider('githubLiveDeliveryProvider')]
+    public function testGithubLiveDelivery(string $name, int $status, string $content, ?string $tag): void
+    {
+        $body = $this->fixture("github-live/$name.body");
+        $headers = json_decode($this->fixture("github-live/$name.headers.json"), true);
+        $configured = 'https://github.com/FivePaths/satisfy.git';
+        $webhook = new GithubWebhook($this->manager([$configured])->reveal(), $this->dispatcher());
+        $webhook->setSecret('github-live-fixture');
+
+        $response = $webhook->getResponse($this->request($body, $headers));
+
+        $this->assertSame($status, $response->getStatusCode());
+        $this->assertSame($content, $response->getContent());
+        $this->assertSame(202 === $status ? [$configured] : [], $this->built);
+        $this->assertSame('github', $this->received[0]->getProvider());
+        $this->assertSame($tag, $this->received[0]->getCreatedTag());
+    }
+
     public function testGithubFormEncodedDeliveryIsQueued(): void
     {
         $body = http_build_query(['payload' => $this->fixture('github-push-tag.json')]);
@@ -356,10 +389,17 @@ class WebhookProvidersTest extends TestCase
     {
         $server = ['REMOTE_ADDR' => $address, 'CONTENT_TYPE' => 'application/json'];
         foreach ($headers as $name => $value) {
-            $server['HTTP_' . strtoupper(str_replace('-', '_', $name))] = $value;
+            $key = strtoupper(str_replace('-', '_', $name));
+            $server['CONTENT_TYPE' === $key ? $key : 'HTTP_' . $key] = $value;
         }
 
-        return Request::create('/webhook', 'POST', [], [], [], $server, $body);
+        $request = Request::create('/webhook', 'POST', [], [], [], $server, $body);
+        if (str_starts_with((string) $request->headers->get('Content-Type'), 'application/x-www-form-urlencoded')) {
+            parse_str($body, $fields);
+            $request->request->replace($fields);
+        }
+
+        return $request;
     }
 
     private function fixture(string $name): string
