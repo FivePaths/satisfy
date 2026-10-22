@@ -16,7 +16,7 @@ use Symfony\Component\Serializer\SerializerInterface;
  *
  * @author Ludovic Fleury <ludo.fleury@gmail.com>
  */
-class JsonPersister implements PersisterInterface
+class JsonPersister implements LockablePersisterInterface
 {
     use SerializerAwareTrait;
 
@@ -57,6 +57,25 @@ class JsonPersister implements PersisterInterface
             JsonEncode::OPTIONS => JSON_PRETTY_PRINT,
         ]);
         $this->persister->flush($jsonString);
+    }
+
+    public function lock(): void
+    {
+        if ($this->persister instanceof LockablePersisterInterface) {
+            $this->persister->lock();
+        }
+    }
+
+    public function unlock(): void
+    {
+        if ($this->persister instanceof LockablePersisterInterface) {
+            $this->persister->unlock();
+        }
+    }
+
+    public function getVersion(): string
+    {
+        return $this->persister instanceof LockablePersisterInterface ? $this->persister->getVersion() : '';
     }
 
     public function normalizeRepositories($repositories): array

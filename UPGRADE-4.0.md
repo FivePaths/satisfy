@@ -2,6 +2,15 @@
 
 4.0 is in development on the `4.x` branch. This file grows with it; `docs/4.0-architecture.md` describes the design.
 
+## `satis.json` is written under a lock on the file
+
+- Every write takes an exclusive `flock()` on `satis.json` itself, and writes the file in place, so a single-file bind mount keeps pointing at it. 3.x locked a separate file inside the container, which nothing else could take.
+- Adding, editing and deleting repositories, from the admin UI, a webhook's auto-add or a `composer.lock` upload, re-reads `satis.json` once the lock is held and applies the change to that. A repository another program added in the meantime is kept; in 3.x the write replaced it.
+- The configuration page replaces almost the whole file, so it is saved only if `satis.json` is unchanged since the page was shown. Otherwise it says so and saves nothing. A submission without the form's version field is saved as in 3.x.
+- Satisfy waits up to 10 seconds for the lock, then fails the write. Another program that writes `satis.json` should take the same exclusive lock, write in place, and hold it briefly.
+- Satis reads `satis.json` without a lock, as it always has.
+- For code that extends Satisfy: `Manager` no longer takes a `LockFactory`, and `Manager::acquireLock()` is gone. `Manager::flush()` takes the version the edit started from, which `Manager::getVersion()` returns. `FilePersister` and `JsonPersister` implement `LockablePersisterInterface`. The `satis` lock is gone from `config/packages/lock.yaml`; `LOCK_DSN` now serves only the build lock.
+
 ## PHP 8.4 and Symfony 7.4
 
 - Satisfy needs PHP 8.4 or later. Satis itself has required 8.4 since July 2026, so no release that updates its dependencies could run on less.

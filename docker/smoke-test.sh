@@ -136,6 +136,11 @@ expect 400 /webhook/gitlab POST
 queue_full_build "$name"
 wait_for 200 /packages.json
 expect 200 /packages.json
+# Satis writes the HTML catalogue after packages.json.
+for _ in $(seq 1 30); do
+  curl -s "$base/" | grep -q 'smoke/test' && break
+  sleep 1
+done
 curl -s "$base/" | grep -q 'smoke/test' || fail "/ is not the built catalogue"
 echo "ok   the worker built the queued catalogue"
 
@@ -164,16 +169,34 @@ parameters:
     admin.auth: true
     admin.users:
         admin: { password: smoke, roles: ROLE_ADMIN }
+    gitlab.auto_add_repo: true
+    gitlab.auto_add_repo_type: vcs
 EOF
+cp "$dir/satis.json" "$dir/satis-upgrade.json"
+chmod 666 "$dir/satis-upgrade.json"
 start "$prefix-upgrade" -p "127.0.0.1:$port:80" \
-  -v "$dir/satis.json:/var/www/html/satis.json" \
+  -v "$dir/satis-upgrade.json:/var/www/html/satis.json" \
   -v "$dir/parameters.yml:/var/www/html/config/parameters.yml:ro" \
-  -v "$prefix-public:/var/www/html/public" "$image"
+  -v "$prefix-public:/var/www/html/public" \
+  -e GITLAB_SECRET=smoke "$image"
 wait_for 200 /login
 expect 200 /login
 expect 302 /admin
 curl -s "$base/packages.json" | grep -q '"smoke":true' || fail "the catalogue in the volume was not kept"
 echo "ok   the old front controller was replaced and the catalogue kept"
+
+# A webhook auto-adds a repository: satis.json, mounted as a single file, has
+# to be written in place, or the container and the host part company.
+inode() { python3 -c 'import os, sys; print(os.stat(sys.argv[1]).st_ino)' "$1"; }
+before="$(inode "$dir/satis-upgrade.json")"
+got="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Gitlab-Token: smoke' \
+  -H 'Content-Type: application/json' \
+  -d '{"object_kind":"push","project":{"git_http_url":"https://git.example.com/smoke/added.git"}}' \
+  "$base/webhook/gitlab")"
+[ "$got" = 202 ] || fail "the GitLab webhook answered $got, expected 202"
+grep -q 'smoke\\\?/added.git' "$dir/satis-upgrade.json" || fail "the webhook did not add the repository to satis.json"
+[ "$(inode "$dir/satis-upgrade.json")" = "$before" ] || fail "satis.json was replaced rather than written in place"
+echo "ok   a webhook added a repository to the mounted satis.json in place"
 docker rm -f "$name" >/dev/null
 
 echo "-- the web server and the worker in separate containers"
