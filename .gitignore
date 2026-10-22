@@ -68,6 +68,9 @@ tmtags
 /vendor/
 ###< symfony/framework-bundle ###
 
+# Symfony 7.4 writes this on every dev cache warmup; the kernel loads YAML only.
+/config/reference.php
+
 ###> friendsofphp/php-cs-fixer ###
 /.php-cs-fixer.php
 /.php-cs-fixer.cache

@@ -2,6 +2,14 @@
 
 4.0 is in development on the `4.x` branch. This file grows with it; `docs/4.0-architecture.md` describes the design.
 
+## PHP 8.4 and Symfony 7.4
+
+- Satisfy needs PHP 8.4 or later. Satis itself has required 8.4 since July 2026, so no release that updates its dependencies could run on less.
+- Symfony 7.4, the long-term release with security fixes until November 2029, replaces 6.4.
+- `doctrine/annotations`, `doctrine/instantiator`, `ramunasd/symfony-container-mocks` and `symfony/proxy-manager-bridge` are no longer dependencies.
+- Forms still use session-based CSRF tokens, as in 3.x. The stateless tokens Symfony's recipe now proposes check the `Origin` header, which no longer matches the request behind a proxy that terminates TLS.
+- For code that extends Satisfy: the form types, the data transformer, the validators and `ConfigurationNormalizer` carry Symfony 7's parameter and return types. `ConfigurationNormalizer` now builds `Configuration`'s repositories itself, because Symfony 7.4's type resolution tries `\ArrayIterator` first among the types `setRepositories()` accepts and so never asks for `RepositoryInterface[]`.
+
 ## The Docker image
 
 - NGINX Unit is gone. The image is `php:8.4-fpm-bookworm` with nginx, php-fpm and the worker, built from `docker/Dockerfile`. It still listens on port 80 and keeps the application in `/var/www/html`, so the same volume mounts work.
