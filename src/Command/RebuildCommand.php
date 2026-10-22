@@ -2,8 +2,8 @@
 
 namespace Playbloom\Command;
 
-use Composer\Json\JsonFile;
 use Composer\Satis\Console\Application;
+use Playbloom\Service\Manager;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputArgument;
@@ -11,6 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Lock\LockFactory;
 
 class RebuildCommand extends Command
@@ -18,7 +19,10 @@ class RebuildCommand extends Command
     public function __construct(
         #[Autowire('%satis_filename%')]
         private readonly string $satisFilename,
+        #[Autowire('%kernel.project_dir%')]
+        private readonly string $projectDir,
         private readonly LockFactory $buildLockFactory,
+        private readonly Manager $manager,
     ) {
         parent::__construct();
     }
@@ -56,14 +60,16 @@ class RebuildCommand extends Command
         $configFile = $this->satisFilename;
         $lifetime = (int)$input->getOption('lifetime');
         $outputDir = $input->getArgument('output-dir');
+        if (!$outputDir) {
+            // The configured directory or Satisfy's default, as the worker uses,
+            // relative to the project directory, where the worker runs Satis.
+            $outputDir = $this->manager->getConfig()->getOutputDir();
+            if (!(new Filesystem())->isAbsolutePath($outputDir)) {
+                $outputDir = $this->projectDir . '/' . $outputDir;
+            }
+        }
 
         if (!empty($lifetime) && is_file($configFile)) {
-            if (!$outputDir) {
-                $file = new JsonFile($configFile);
-                $config = $file->read();
-                $outputDir = $config['output-dir'] ?? null;
-            }
-
             $modifiedAt = filemtime($configFile);
             $lastUpdate = @filemtime($outputDir . '/packages.json');
             if ($modifiedAt < $lastUpdate && time() - $lastUpdate < $lifetime) {

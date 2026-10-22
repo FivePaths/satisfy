@@ -25,7 +25,7 @@ A 3.x deployment that mounted its own `config/config.yml` has to move those over
 - `SATISFY_QUEUE_DIR` (default `var/queue`, and `/var/www/queue` in the image) is where requests wait. The web server and the worker must both be able to write it.
 - `SATISFY_BUILD_TIMEOUT` (default `600`) is how many seconds one Satis build may run.
 - The worker writes the last build's output to `var/log/build.log`, and one JSON line per build to its own output.
-- `bin/console satisfy:rebuild` still builds in the calling process. It now takes the same lock as the worker, so the two never run at once.
+- `bin/console satisfy:rebuild` still builds in the calling process. It now takes the same lock as the worker, so the two never run at once. With no output directory given it uses the one `satis.json` names, or Satisfy's default `public`, as the worker does; in 3.x it failed when `satis.json` named none.
 
 ## Webhooks answer before the build
 

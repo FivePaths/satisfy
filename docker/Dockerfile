@@ -35,7 +35,8 @@ ENV APP_PATH=/var/www/html \
     SATISFY_QUEUE_DIR=/var/www/queue
 
 WORKDIR /var/www/html
-RUN chown www-data:www-data /var/www /var/www/html
+# The base image leaves /var/www/html writable by everyone.
+RUN chown www-data:www-data /var/www /var/www/html && chmod 0755 /var/www/html
 
 USER www-data
 RUN set -eux; \
