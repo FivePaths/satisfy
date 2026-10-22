@@ -16,6 +16,7 @@ Satisfy provides:
 * a simple security layer with a login form
 * a webhook endpoints for the most popular version control systems
 * Satis itself
+* optional plugins, enabled with `SATISFY_PLUGINS`: per-token access to the catalogue with per-package grants (`authz`), and a registration gate and publishing on tag for GitLab system hooks (`hookgate`). See [docs/plugins.md](docs/plugins.md)
 
 Satisfy ease your satis configuration management. It provides a simple web UI over Satis to avoid a hand-editing of the satis.json configuration file. All repositories from a composer.lock file can also be imported via upload.
 

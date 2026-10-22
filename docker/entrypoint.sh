@@ -33,10 +33,38 @@ prepare() {
   if [ "$(id -u)" -eq 0 ]; then
     chown www-data:www-data "$app/var" "$queue"
   fi
+  if plugin_enabled authz && [ -n "${AUTHZ_DATA_DIR:-}" ]; then
+    mkdir -p "$AUTHZ_DATA_DIR"
+    if [ "$(id -u)" -eq 0 ]; then
+      chown www-data:www-data "$AUTHZ_DATA_DIR"
+    fi
+  fi
+  configure_nginx
 
   # Compile the configuration on every start, so a changed parameters.yml or
   # environment takes effect without anyone running cache:clear.
   "${as_app[@]}" php "$app/bin/console" cache:clear --no-interaction
+}
+
+# Is a plugin named in SATISFY_PLUGINS?
+plugin_enabled() {
+  local list
+  list=",$(printf '%s' "${SATISFY_PLUGINS:-}" | tr -d ' ' | tr '[:upper:]' '[:lower:]'),"
+  [[ "$list" == *",$1,"* ]]
+}
+
+# The nginx includes for the enabled plugins; empty files otherwise.
+configure_nginx() {
+  local dir=/etc/nginx/satisfy templates=/usr/local/share/satisfy-nginx realm server
+  : > "$dir/server.conf"
+  : > "$dir/catalogue.conf"
+  if plugin_enabled authz; then
+    # The realm Composer and browsers show; quotes and backslashes are dropped.
+    realm="$(printf '%s' "${AUTHZ_REALM:-Composer repository}" | tr -d '"\\')"
+    server="$(<"$templates/authz-server.conf")"
+    printf '%s\n' "${server//@REALM@/$realm}" > "$dir/server.conf"
+    cp "$templates/authz-catalogue.conf" "$dir/catalogue.conf"
+  fi
 }
 
 start_web() {

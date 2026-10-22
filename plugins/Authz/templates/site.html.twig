@@ -1,0 +1,83 @@
+{% extends "base.html.twig" %}
+
+{% block title %}{{ site }}{% endblock %}
+
+{% block content %}
+    <p><a href="{{ path('authz') }}">&larr; All sites</a></p>
+    <h2><code>{{ site }}</code></h2>
+    <p>
+        <span class="label label-{{ row.active ? 'success' : 'danger' }}">{{ row.active ? 'active' : 'revoked' }}</span>
+        <span class="label label-{{ row.package_enforce ? 'primary' : 'default' }}">packages: {{ row.package_enforce ? 'enforcing' : 'observing' }}</span>
+        {{ seen is null ? 'Never authenticated.' : 'Last seen ' ~ seen.last|date('Y-m-d H:i') ~ '.' }}
+    </p>
+
+    {% if issued %}
+        <div class="panel panel-warning">
+            <div class="panel-heading">{{ issued.rotated ? 'Token replaced' : 'Token issued' }}: shown once, only its hash is kept</div>
+            <div class="panel-body">
+                <p>Token</p>
+                <pre>{{ issued.token }}</pre>
+                <p>COMPOSER_AUTH, which is also the whole of an <code>auth.json</code></p>
+                <pre>{{ composer_auth }}</pre>
+                {% if issued.rotated %}<p>The previous token stopped working at once.</p>{% endif %}
+            </div>
+        </div>
+    {% endif %}
+
+    <h3>Note</h3>
+    <form method="post" action="{{ path('authz_action') }}" class="form-inline">
+        <input type="hidden" name="_token" value="{{ csrf_token(csrf) }}">
+        <input type="hidden" name="action" value="note">
+        <input type="hidden" name="site" value="{{ site }}">
+        <input class="form-control" name="note" value="{{ row.note }}" size="60" placeholder="what this site is">
+        <button class="btn btn-default">Save</button>
+    </form>
+
+    {% if requests is not empty %}
+        <h3>Asking for</h3>
+        <p>{% include '@Authz/_action.html.twig' with {action: 'approve_all', site: site, label: 'Approve all ' ~ requests|length, class: 'btn-primary'} %}</p>
+        <table class="table table-condensed">
+            {% for request in requests %}
+                <tr>
+                    <td><code>{{ request.package }}</code></td>
+                    <td>since {{ request.first_seen|date('Y-m-d H:i') }}</td>
+                    <td class="text-right">
+                        {% include '@Authz/_action.html.twig' with {action: 'approve', site: site, package: request.package, label: 'Approve', class: 'btn-primary'} %}
+                        {% include '@Authz/_action.html.twig' with {action: 'dismiss', site: site, package: request.package, label: 'Dismiss'} %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% endif %}
+
+    <h3>Granted <small>{{ reach }} package{{ reach == 1 ? '' : 's' }} reachable, dependencies included</small></h3>
+    <table class="table table-condensed">
+        {% for package in direct %}
+            <tr>
+                <td><code>{{ package }}</code></td>
+                <td class="text-right">{% include '@Authz/_action.html.twig' with {action: 'ungrant', site: site, package: package, label: 'Remove'} %}</td>
+            </tr>
+        {% else %}
+            <tr><td>Nothing granted: every package request is refused once package enforcement is on.</td></tr>
+        {% endfor %}
+    </table>
+    {% if implied is not empty %}
+        <p>Through dependencies: {% for package in implied %}<span class="label label-default">{{ package }}</span> {% endfor %}</p>
+    {% endif %}
+
+    <form method="post" action="{{ path('authz_action') }}" class="form-inline">
+        <input type="hidden" name="_token" value="{{ csrf_token(csrf) }}">
+        <input type="hidden" name="action" value="grant">
+        <input type="hidden" name="site" value="{{ site }}">
+        <input class="form-control" name="package" list="authz-hosted" placeholder="vendor/package or vendor/*" size="40" required>
+        <datalist id="authz-hosted">{% for package in hosted %}<option value="{{ package }}">{% endfor %}</datalist>
+        <button class="btn btn-default">Grant</button>
+    </form>
+
+    <h3>Settings</h3>
+    <p>
+        {% include '@Authz/_action.html.twig' with {action: 'pkgmode', site: site, value: row.package_enforce ? 'off' : 'on', label: row.package_enforce ? 'Only record other packages' : 'Refuse other packages'} %}
+        {% include '@Authz/_action.html.twig' with {action: 'issue', site: site, label: 'Replace the token', class: 'btn-warning'} %}
+        {% include '@Authz/_action.html.twig' with {action: row.active ? 'revoke' : 'restore', site: site, label: row.active ? 'Revoke' : 'Restore', class: row.active ? 'btn-danger' : 'btn-default'} %}
+    </p>
+{% endblock %}

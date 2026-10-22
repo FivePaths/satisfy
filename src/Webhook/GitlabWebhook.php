@@ -68,7 +68,7 @@ class GitlabWebhook extends AbstractWebhook
         if (!$repository) {
             if ($this->autoAdd && !empty($originalUrls)) {
                 $repository = new Repository($originalUrls[0], $this->autoAddType);
-                $this->manager->add($repository);
+                $this->addRepository($repository, $request);
             } else {
                 $error = sprintf('Cannot find specified repository "%s"', implode(' OR ', $originalUrls));
                 throw new \InvalidArgumentException($error);

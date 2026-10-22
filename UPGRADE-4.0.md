@@ -2,6 +2,13 @@
 
 4.0 is in development on the `4.x` branch. This file grows with it; `docs/4.0-architecture.md` describes the design.
 
+## Plugins
+
+- `SATISFY_PLUGINS` enables plugins, comma-separated; none by default. Two ship with 4.0: `authz` (per-token access with per-package grants) and `hookgate` (a registration gate and auto-require for GitLab system hooks). `docs/plugins.md` describes them, and how to move from the standalone services they replace.
+- With the image, enabling `authz` puts the catalogue behind `auth_request`; nothing changes while it is not enabled.
+- A webhook delivery that a plugin skips, or whose auto-add a plugin refuses, is answered 200 with `skipped: <reason>`.
+- For code that extends Satisfy: two new events, `WebhookReceivedEvent` and `RepositoryAddingEvent`; `AbstractWebhook::addRepository()` dispatches the second before an auto-add, and the GitLab and GitHub webhooks use it. `Manager::modify()` applies a change to `satis.json` under the lock, and `JsonPersister::serialize()` gives the JSON a flush would write.
+
 ## `satis.json` is written under a lock on the file
 
 - Every write takes an exclusive `flock()` on `satis.json` itself, and writes the file in place, so a single-file bind mount keeps pointing at it. 3.x locked a separate file inside the container, which nothing else could take.

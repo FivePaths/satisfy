@@ -68,7 +68,11 @@
         "symfony/css-selector": "7.4.*"
     },
     "autoload": {
-        "psr-4": { "Playbloom\\": "src/" }
+        "psr-4": {
+            "Playbloom\\": "src/",
+            "Playbloom\\Plugin\\Authz\\": "plugins/Authz/src/",
+            "Playbloom\\Plugin\\Hookgate\\": "plugins/Hookgate/src/"
+        }
     },
     "autoload-dev": {
         "psr-4": { "Playbloom\\Tests\\": "tests" }

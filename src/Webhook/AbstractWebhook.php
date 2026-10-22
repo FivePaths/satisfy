@@ -3,6 +3,9 @@
 namespace Playbloom\Webhook;
 
 use Playbloom\Event\BuildEvent;
+use Playbloom\Event\RepositoryAddingEvent;
+use Playbloom\Event\WebhookReceivedEvent;
+use Playbloom\Exception\WebhookSkippedException;
 use Playbloom\Model\RepositoryInterface;
 use Playbloom\Service\Manager;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -33,6 +36,14 @@ abstract class AbstractWebhook
     }
 
     /**
+     * The provider's name, as in the webhook's path: gitlab, github, gitea, bitbucket or devops.
+     */
+    public function getProvider(): string
+    {
+        return strtolower((string) preg_replace('/Webhook$/', '', (new \ReflectionClass($this))->getShortName()));
+    }
+
+    /**
      * @throws BadRequestHttpException
      * @throws ServiceUnavailableHttpException
      */
@@ -40,8 +51,17 @@ abstract class AbstractWebhook
     {
         try {
             $this->validate($request);
+
+            $received = new WebhookReceivedEvent($this->getProvider(), $request, $this->getPayload($request));
+            $this->dispatcher->dispatch($received);
+            if (null !== $response = $received->getResponse()) {
+                return $response;
+            }
+
             $repository = $this->getRepository($request);
             $event = $this->handle($repository);
+        } catch (WebhookSkippedException $exception) {
+            return new Response('skipped: ' . $exception->getMessage(), Response::HTTP_OK);
         } catch (\InvalidArgumentException $exception) {
             throw new BadRequestHttpException($exception->getMessage(), $exception);
         } catch (\Throwable $exception) {
@@ -89,5 +109,36 @@ abstract class AbstractWebhook
         }
 
         return null;
+    }
+
+    /**
+     * Auto-adds a repository a delivery named, unless a listener refuses it.
+     *
+     * @throws WebhookSkippedException
+     */
+    protected function addRepository(RepositoryInterface $repository, Request $request): void
+    {
+        $event = new RepositoryAddingEvent($repository, $this->getProvider(), $this->getPayload($request));
+        $this->dispatcher->dispatch($event);
+        if ($event->isRefused()) {
+            throw new WebhookSkippedException((string) $event->getRefusal());
+        }
+        $this->manager->add($repository);
+    }
+
+    /**
+     * The delivery's JSON body, or its form-encoded "payload" field, which
+     * GitHub and Gitea can send instead.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getPayload(Request $request): array
+    {
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload) && $request->request->has('payload')) {
+            $payload = json_decode((string) $request->request->get('payload'), true);
+        }
+
+        return is_array($payload) ? $payload : [];
     }
 }

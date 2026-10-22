@@ -45,7 +45,15 @@ class JsonPersister implements LockablePersisterInterface
 
     public function flush($object): void
     {
-        $jsonString = $this->serializer->serialize($object, 'json', [
+        $this->persister->flush($this->serialize($object));
+    }
+
+    /**
+     * The configuration as flush() would write it.
+     */
+    public function serialize(Configuration $object): string
+    {
+        return $this->serializer->serialize($object, 'json', [
             AbstractObjectNormalizer::SKIP_NULL_VALUES => true,
             AbstractObjectNormalizer::CALLBACKS => [
                 'repositories' => [$this, 'normalizeRepositories'],
@@ -56,7 +64,6 @@ class JsonPersister implements LockablePersisterInterface
             ],
             JsonEncode::OPTIONS => JSON_PRETTY_PRINT,
         ]);
-        $this->persister->flush($jsonString);
     }
 
     public function lock(): void

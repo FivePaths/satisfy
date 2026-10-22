@@ -24,6 +24,9 @@
         <i class="glyphicon glyphicon-refresh" aria-hidden="true"></i>
         Build packages
     </a>
+    {% for label, route in plugin_admin_links() %}
+    <a href="{{ path(route) }}" class="btn btn-large btn-block btn-default">{{ label }}</a>
+    {% endfor %}
 
     <ul class="nav nav-pills nav-stacked">
     {% for repository in repositories %}

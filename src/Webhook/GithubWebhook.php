@@ -129,7 +129,7 @@ class GithubWebhook extends AbstractWebhook
         if (!$repository) {
             if ($this->autoAdd && !empty($originalUrls)) {
                 $repository = new Repository($originalUrls[0], $this->autoAddType);
-                $this->manager->add($repository);
+                $this->addRepository($repository, $request);
             } else {
                 throw new \InvalidArgumentException('Cannot find specified repository');
             }

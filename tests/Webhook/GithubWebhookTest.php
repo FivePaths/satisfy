@@ -4,6 +4,8 @@ namespace Playbloom\Tests\Webhook;
 
 use PHPUnit\Framework\TestCase;
 use Playbloom\Event\BuildEvent;
+use Playbloom\Event\RepositoryAddingEvent;
+use Playbloom\Event\WebhookReceivedEvent;
 use Playbloom\Model\Repository;
 use Playbloom\Service\Manager;
 use Playbloom\Webhook\GithubWebhook;
@@ -127,6 +129,11 @@ class GithubWebhookTest extends TestCase
 
     protected function getDispatcherMock(): ObjectProphecy
     {
-        return $this->prophesize(EventDispatcher::class);
+        $dispatcher = $this->prophesize(EventDispatcher::class);
+        // Dispatched on every delivery; nothing in these tests listens to them.
+        $dispatcher->dispatch(Argument::type(WebhookReceivedEvent::class))->willReturnArgument(0);
+        $dispatcher->dispatch(Argument::type(RepositoryAddingEvent::class))->willReturnArgument(0);
+
+        return $dispatcher;
     }
 }

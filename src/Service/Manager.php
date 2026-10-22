@@ -72,7 +72,7 @@ class Manager
      */
     public function add(RepositoryInterface $repository): void
     {
-        $this->change(function (Configuration $config) use ($repository): void {
+        $this->modify(function (Configuration $config) use ($repository): void {
             $config->getRepositories()->offsetSet($repository->getId(), $repository);
         });
     }
@@ -84,7 +84,7 @@ class Manager
      */
     public function addAll(array $repositories): void
     {
-        $this->change(function (Configuration $config) use ($repositories): void {
+        $this->modify(function (Configuration $config) use ($repositories): void {
             foreach ($repositories as $repository) {
                 $config->getRepositories()->offsetSet($repository->getId(), $repository);
             }
@@ -98,7 +98,7 @@ class Manager
      */
     public function update(RepositoryInterface $repository, RepositoryInterface $updated): void
     {
-        $this->change(function (Configuration $config) use ($repository, $updated): void {
+        $this->modify(function (Configuration $config) use ($repository, $updated): void {
             $repos = $config->getRepositories();
             if (!$repos->offsetExists($repository->getId())) {
                 throw new \RuntimeException('Unknown repository');
@@ -113,7 +113,7 @@ class Manager
      */
     public function delete(RepositoryInterface $repository): void
     {
-        $this->change(function (Configuration $config) use ($repository): void {
+        $this->modify(function (Configuration $config) use ($repository): void {
             $config->getRepositories()->offsetUnset($repository->getId());
         });
     }
@@ -178,7 +178,7 @@ class Manager
      *
      * @param callable(Configuration): void $change
      */
-    private function change(callable $change): void
+    public function modify(callable $change): void
     {
         $this->persister->lock();
         try {

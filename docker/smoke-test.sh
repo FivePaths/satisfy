@@ -107,8 +107,7 @@ expect_environ() {
 }
 
 running() {
-  docker exec "$name" sh -c 'for d in /proc/[0-9]*; do tr "\0" " " < "$d/cmdline" 2>/dev/null; echo; done' \
-    | grep -q "^$1"
+  grep -q "^$1" <<< "$(docker exec "$name" sh -c 'for d in /proc/[0-9]*; do tr "\0" " " < "$d/cmdline" 2>/dev/null; echo; done')"
 }
 
 cat > "$dir/satis.json" <<'EOF'
@@ -137,11 +136,13 @@ queue_full_build "$name"
 wait_for 200 /packages.json
 expect 200 /packages.json
 # Satis writes the HTML catalogue after packages.json.
+# Output is captured before grep -q: with pipefail, grep stopping early
+# makes curl fail on the rest of a large page.
 for _ in $(seq 1 30); do
-  curl -s "$base/" | grep -q 'smoke/test' && break
+  grep -q 'smoke/test' <<< "$(curl -s "$base/")" && break
   sleep 1
 done
-curl -s "$base/" | grep -q 'smoke/test' || fail "/ is not the built catalogue"
+grep -q 'smoke/test' <<< "$(curl -s "$base/")" || fail "/ is not the built catalogue"
 echo "ok   the worker built the queued catalogue"
 
 expect_environ 'php-fpm' without
@@ -182,7 +183,7 @@ start "$prefix-upgrade" -p "127.0.0.1:$port:80" \
 wait_for 200 /login
 expect 200 /login
 expect 302 /admin
-curl -s "$base/packages.json" | grep -q '"smoke":true' || fail "the catalogue in the volume was not kept"
+grep -q '"smoke":true' <<< "$(curl -s "$base/packages.json")" || fail "the catalogue in the volume was not kept"
 echo "ok   the old front controller was replaced and the catalogue kept"
 
 # A webhook auto-adds a repository: satis.json, mounted as a single file, has
@@ -213,5 +214,48 @@ queue_full_build "$name"
 wait_for 200 /packages.json
 expect 200 /packages.json
 echo "ok   a build queued through the web container was built by the worker container"
+docker rm -f "$prefix-web" "$prefix-worker" >/dev/null
+
+echo "-- the authz and hookgate plugins"
+start "$prefix-plugins" -p "127.0.0.1:$port:80" \
+  -v "$dir/satis.json:/var/www/html/satis.json" \
+  -e SATISFY_PLUGINS=authz,hookgate -e TOKEN_PEPPER=smoke-pepper -e ADMIN_KEY=smoke-admin-key \
+  -e AUTHZ_REALM='Smoke Packages' "$image"
+wait_for 200 /admin
+console() { docker exec -u www-data "$name" php bin/console "$@"; }
+grep -q AutoRequire <<< "$(console debug:event-dispatcher 'Playbloom\Event\WebhookReceivedEvent')" \
+  || fail "hookgate's auto-require is not listening"
+queue_full_build "$name"
+wait_for 200 /packages.json
+expect 200 /packages.json
+
+# Two packages in the catalogue; the site is granted one of them.
+docker exec -u www-data "$name" sh -c '
+  mkdir -p public/p2/smoke
+  for p in app other; do
+    printf "{\"packages\":{\"smoke/%s\":[{\"version\":\"1.0.0\"}]}}" "$p" > "public/p2/smoke/$p.json"
+  done'
+token="$(console authz issue smoke-site | sed -n 's/^  token  //p')"
+[ -n "$token" ] || fail "authz issue printed no token"
+console authz grant smoke-site smoke/app >/dev/null
+console authz enforce on >/dev/null
+
+expect 401 /packages.json
+grep -qi 'WWW-Authenticate: Basic realm="Smoke Packages"' <<< "$(curl -s -D - -o /dev/null "$base/packages.json")" \
+  || fail "no Basic challenge with the configured realm"
+expect_as() {
+  local want="$1" path="$2" got
+  got="$(curl -s -o /dev/null -w '%{http_code}' -u "smoke-site:$token" "$base$path")"
+  [ "$got" = "$want" ] || fail "GET $path with the site's token answered $got, expected $want"
+  echo "ok   GET $path as smoke-site -> $got"
+}
+expect_as 200 /packages.json
+expect_as 200 /p2/smoke/app.json
+expect_as 403 /p2/smoke/other.json
+expect 401 /_authzcheck
+expect_as 200 /_authzcheck
+expect 200 /admin
+grep -q 'smoke/other' <<< "$(console authz requests)" || fail "the refused package was not queued for approval"
+echo "ok   authz: tokens, grants, the canary and the approval queue"
 
 echo "smoke test passed"
