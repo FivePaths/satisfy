@@ -3,24 +3,30 @@
 {% block title %}Satis build{% endblock %}
 
 {% block content %}
+    {{ form_start(form) }}
+        <p id="satisStatus">&nbsp;</p>
+        {{ form_widget(form.build, {'attr': {'class': 'btn btn-large btn-block btn-primary'}}) }}
+    {{ form_end(form) }}
     <pre id="satisOutput"></pre>
 {% endblock %}
 
 {% block javascript %}
     <script type="text/javascript">
     $(function(){
+        var status = $("#satisStatus");
         var output = $("#satisOutput");
-        var outputSource = new EventSource("{{ path('satis_build_run') }}");
-        outputSource.onmessage = function(event){
-            if (event.data == '__done__') {
-                outputSource.close();
-                return;
-            }
-            output
-                .append(event.data)
-                .append("\n");
-            window.scrollTo(0, document.body.scrollHeight);
+        var refresh = function(){
+            $.getJSON("{{ path('satis_build_status') }}", function(data){
+                var text = data.building ? 'Building.' : 'No build running.';
+                if (data.pending > 0) {
+                    text += ' ' + data.pending + ' waiting.';
+                }
+                status.text(text);
+                output.text(data.log);
+            });
         };
+        refresh();
+        setInterval(refresh, 2000);
     });
     </script>
 {% endblock %}

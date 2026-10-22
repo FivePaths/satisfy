@@ -10,12 +10,18 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\DependencyInjection\ContainerAwareInterface;
-use Symfony\Component\DependencyInjection\ContainerAwareTrait;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Lock\LockFactory;
 
-class RebuildCommand extends Command implements ContainerAwareInterface
+class RebuildCommand extends Command
 {
-    use ContainerAwareTrait;
+    public function __construct(
+        #[Autowire('%satis_filename%')]
+        private readonly string $satisFilename,
+        private readonly LockFactory $buildLockFactory,
+    ) {
+        parent::__construct();
+    }
 
     /**
      * {@inheritdoc}
@@ -25,7 +31,7 @@ class RebuildCommand extends Command implements ContainerAwareInterface
         $this
             ->setName('satisfy:rebuild')
             ->setDescription('Rebuild composer packages when config is changed or definitions is outdated')
-            ->setHelp('')
+            ->setHelp('Builds in this process, under the same lock as the worker, so the two never overlap.')
             ->addArgument('file', InputArgument::OPTIONAL, 'Json file to use', './satis.json')
             ->addArgument('output-dir', InputArgument::OPTIONAL, 'Location where to output built files', null)
             ->addArgument(
@@ -47,7 +53,7 @@ class RebuildCommand extends Command implements ContainerAwareInterface
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $configFile = $this->container->getParameter('satis_filename');
+        $configFile = $this->satisFilename;
         $lifetime = (int)$input->getOption('lifetime');
         $outputDir = $input->getArgument('output-dir');
 
@@ -73,6 +79,12 @@ class RebuildCommand extends Command implements ContainerAwareInterface
         ]);
         $application = new Application();
 
-        return $application->doRun($satisInput, $output);
+        $lock = $this->buildLockFactory->createLock('build');
+        $lock->acquire(true);
+        try {
+            return $application->doRun($satisInput, $output);
+        } finally {
+            $lock->release();
+        }
     }
 }

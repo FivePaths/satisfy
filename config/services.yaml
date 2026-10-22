@@ -7,6 +7,8 @@ parameters:
     secret: '%env(APP_SECRET)%'
     satis_filename: '%env(resolve:SATIS_CONFIG)%'
     satis_log_path: '%env(resolve:SATIS_LOG)%'
+    satisfy.queue_dir: '%env(resolve:SATISFY_QUEUE_DIR)%'
+    satisfy.build_timeout: '%env(int:SATISFY_BUILD_TIMEOUT)%'
     admin.auth: false
     admin.users: {  }
     composer.home: '%env(resolve:COMPOSER_HOME)%'
@@ -109,6 +111,13 @@ services:
         public: true
         arguments:
             $satisFilename: "%satis_filename%"
+            $timeout: "%satisfy.build_timeout%"
+            $logFile: "%kernel.logs_dir%/build.log"
+
+    Playbloom\Queue\BuildQueue:
+        public: true
+        arguments:
+            $queueDir: "%satisfy.queue_dir%"
         tags:
             - { name: kernel.event_listener, event: Playbloom\Event\BuildEvent, method: onBuild }
 

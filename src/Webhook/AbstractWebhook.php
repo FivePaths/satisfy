@@ -41,22 +41,32 @@ abstract class AbstractWebhook
         try {
             $this->validate($request);
             $repository = $this->getRepository($request);
-            $status = $this->handle($repository);
+            $event = $this->handle($repository);
         } catch (\InvalidArgumentException $exception) {
             throw new BadRequestHttpException($exception->getMessage(), $exception);
         } catch (\Throwable $exception) {
             throw new ServiceUnavailableHttpException(null, '', $exception, $exception->getCode());
         }
 
+        if ($event->isQueued()) {
+            return new Response('queued', Response::HTTP_ACCEPTED);
+        }
+
+        // No listener queued or ran the build: one stopped the event first.
+        $status = $event->getStatus();
+        if (null === $status) {
+            return new Response('skipped', Response::HTTP_OK);
+        }
+
         return new Response((string) $status, 0 === $status ? Response::HTTP_OK : Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 
-    public function handle(RepositoryInterface $repository): ?int
+    public function handle(RepositoryInterface $repository): BuildEvent
     {
         $event = new BuildEvent($repository);
         $this->dispatcher->dispatch($event);
 
-        return $event->getStatus();
+        return $event;
     }
 
     /**

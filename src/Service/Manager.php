@@ -178,6 +178,16 @@ class Manager
         return $this->configuration;
     }
 
+    /**
+     * Drops the cached configuration and reads the file again.
+     */
+    public function reload(): Configuration
+    {
+        $this->configuration = null;
+
+        return $this->getConfig();
+    }
+
     public function acquireLock(): LockInterface
     {
         if (!$this->lock->acquire()) {
