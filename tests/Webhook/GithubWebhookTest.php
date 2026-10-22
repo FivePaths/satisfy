@@ -14,7 +14,6 @@ use Prophecy\PhpUnit\ProphecyTrait;
 use Prophecy\Prophecy\ObjectProphecy;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 class GithubWebhookTest extends TestCase
@@ -65,12 +64,9 @@ class GithubWebhookTest extends TestCase
         $handler = new GithubWebhook($manager->reveal(), $dispatcher->reveal());
         $response = $handler->getResponse($request);
 
-        $this->assertInstanceOf(StreamedResponse::class, $response);
-        ob_start();
-        $response->sendContent();
-        $result = ob_get_clean();
-
-        $this->assertEquals('OK', $result);
+        // The mock ran the build in place, as 3.x did; the queue answers 202.
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('0', $response->getContent());
     }
 
     public function testValidRequestWithRepoAutoAdd(): void
@@ -79,7 +75,7 @@ class GithubWebhookTest extends TestCase
         $manager
             ->findByUrl(Argument::type('string'))
             ->willReturn(null)
-            ->shouldBeCalledTimes(4);
+            ->shouldBeCalledTimes(5);
 
         $manager
             ->add(Argument::type(Repository::class))
@@ -103,12 +99,9 @@ class GithubWebhookTest extends TestCase
         $handler->setAutoAddType('github');
         $response = $handler->getResponse($request);
 
-        $this->assertInstanceOf(StreamedResponse::class, $response);
-        ob_start();
-        $response->sendContent();
-        $result = ob_get_clean();
-
-        $this->assertEquals('OK', $result);
+        // The mock ran the build in place, as 3.x did; the queue answers 202.
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('0', $response->getContent());
     }
 
     protected static function createRequest($content, string $event = 'push'): Request

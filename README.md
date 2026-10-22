@@ -70,6 +70,18 @@ A bin shortcut to Satis is already included in Satisfy, so run the following com
 
 For example, you can trigger a package generation for your BitBucket project by setting up a BitBucket webhook to connect back to [your-satis-url]/webhook/bitbucket every time you do a code push. This is more efficient than doing a full build and avoids you having to run full builds on a frequent schedule or logging in to the admin interface just to force a build.
 
+A delivery for a repository in `satis.json` queues a build of that repository, and is answered `202 queued`; the worker runs the build.
+
+| Provider | Endpoint | Secret | Checked against |
+|---|---|---|---|
+| GitLab | `/webhook/gitlab` | `GITLAB_SECRET` | `X-Gitlab-Token` |
+| GitHub | `/webhook/github` | `GITHUB_SECRET` | `X-Hub-Signature-256`; JSON or form-encoded |
+| Gitea | `/webhook/gitea` | `GITEA_SECRET` | `X-Gitea-Signature` |
+| Bitbucket Cloud | `/webhook/bitbucket` | `BITBUCKET_SECRET` | `X-Hub-Signature`; without a secret, Atlassian's published addresses |
+| Azure DevOps | `/webhook/devops` | `DEVOPS_SECRET` | An `X-DEVOPS-TOKEN` header added under the service hook's "HTTP headers"; "Resource details to send" must be All |
+
+GitLab, GitHub and Gitea can also add a repository `satis.json` does not list yet: see the `*.auto_add_repo` parameters in `config/services.yaml`.
+
 ## Prebuilt docker image
 
 You can run satisfy using prebuilt docker image. Here is an example how to setup it.

@@ -131,6 +131,12 @@ expect 200 /
 expect 404 /packages.json
 expect 404 /index.php
 expect 400 /webhook/gitlab POST
+# Without a secret, Bitbucket's webhook takes deliveries only from Atlassian's addresses.
+expect 400 /webhook/bitbucket POST
+got="$(curl -s -X POST -H 'X-GitHub-Event: ping' -H 'Content-Type: application/json' \
+  -d '{"zen":"smoke","hook_id":1}' "$base/webhook/github")"
+[ "$got" = 'skipped: ping' ] || fail "the GitHub webhook answered a ping with: $got"
+echo "ok   POST /webhook/github ping -> skipped"
 
 queue_full_build "$name"
 wait_for 200 /packages.json

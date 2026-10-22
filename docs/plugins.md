@@ -63,7 +63,7 @@ Turn on `admin.auth` in `parameters.yml` when this plugin is enabled: `/admin/au
 - The database schema and file names are the same. Mount the old `authz/data` directory at `AUTHZ_DATA_DIR`, and keep `TOKEN_PEPPER` and `ADMIN_KEY`: every token keeps working.
 - `authzctl <args>` becomes `docker exec -u www-data <container> bin/console authz <args>`.
 - The web UI moves from `/_authzui`, with its own Basic login, to `/admin/authz`, with Satisfy's.
-- Credentials are printed as `COMPOSER_AUTH` and `auth.json`, for the host in `satis.json`'s homepage. The hub synchronisation, which was never switched on, is not ported.
+- Credentials are printed as `COMPOSER_AUTH` and `auth.json`, for the host in `satis.json`'s homepage. Its synchronisation with support.fivepaths.com, which was never switched on, is not ported.
 
 ## hookgate
 

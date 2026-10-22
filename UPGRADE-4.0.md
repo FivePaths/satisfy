@@ -1,13 +1,30 @@
 # Upgrading to Satisfy 4.0
 
-4.0 is in development on the `4.x` branch. This file grows with it; `docs/4.0-architecture.md` describes the design.
+4.0 keeps 3.x's `satis.json`, output URLs, webhook paths, admin UI, `parameters.yml` keys and environment variables. What changes is how builds run, what serves the catalogue, and how `satis.json` is written. `docs/4.0-architecture.md` describes the design; the sections below list every change.
+
+## What a 3.x deployment has to do
+
+With the Docker image:
+
+1. Pull the 4.0 image. The default role runs nginx, php-fpm and the worker together, so the same `docker run` or Compose service keeps working.
+2. If you mounted your own `config/config.yml`, move its overrides into a file under `config/packages/`. A mounted `parameters.yml` is read again and needs nothing.
+3. If anything reads a webhook's response to learn whether the build passed, have it read the worker's output or `var/log/build.log` instead.
+4. If Bitbucket's webhook reaches Satisfy through a reverse proxy, set `BITBUCKET_SECRET` and give the webhook the same secret.
+5. If another program writes `satis.json`, have it take an exclusive `flock()` on the file and write it in place.
+
+Without the image:
+
+1. Run PHP 8.4 or later, then `composer install`.
+2. Steps 2 to 5 above.
+3. Run `bin/console satisfy:worker` as a service, as the user the web server runs as, or from cron with `--once`. Nothing builds without it.
+4. Point the web server's document root at `public/` as before. Serving `packages.json`, `p2/`, `include/` and `dist/` as static files, as the image's `docker/nginx.conf` does, keeps PHP out of Composer's requests.
 
 ## Plugins
 
 - `SATISFY_PLUGINS` enables plugins, comma-separated; none by default. Two ship with 4.0: `authz` (per-token access with per-package grants) and `hookgate` (a registration gate and auto-require for GitLab system hooks). `docs/plugins.md` describes them, and how to move from the standalone services they replace.
 - With the image, enabling `authz` puts the catalogue behind `auth_request`; nothing changes while it is not enabled.
 - A webhook delivery that a plugin skips, or whose auto-add a plugin refuses, is answered 200 with `skipped: <reason>`.
-- For code that extends Satisfy: two new events, `WebhookReceivedEvent` and `RepositoryAddingEvent`; `AbstractWebhook::addRepository()` dispatches the second before an auto-add, and the GitLab and GitHub webhooks use it. `Manager::modify()` applies a change to `satis.json` under the lock, and `JsonPersister::serialize()` gives the JSON a flush would write.
+- For code that extends Satisfy: two new events, `WebhookReceivedEvent` and `RepositoryAddingEvent`; `AbstractWebhook::addRepository()` dispatches the second before an auto-add, and the GitLab, GitHub and Gitea webhooks use it. `Manager::modify()` applies a change to `satis.json` under the lock, and `JsonPersister::serialize()` gives the JSON a flush would write.
 
 ## `satis.json` is written under a lock on the file
 
@@ -56,6 +73,22 @@ A 3.x deployment that mounted its own `config/config.yml` has to move those over
 - A webhook answers `202 Accepted` with the body `queued` once the build is queued. In 3.x it answered after the build, `200` with the exit code or `500`.
 - If a listener stops `BuildEvent` before the queue sees it, the webhook answers `200` with `skipped`.
 - Anything that read the webhook's response to learn the build result has to read the worker's output or `var/log/build.log` instead.
+
+## The GitHub, Gitea, Bitbucket and Azure DevOps webhooks
+
+Each was checked against the deliveries its provider documents; `tests/Webhook/WebhookProvidersTest.php` replays them.
+
+- GitHub and Gitea answer as the others do: `202 queued`. 3.x answered `200 OK` and then built while the connection closed. Their deliveries now pass through `WebhookReceivedEvent` and `RepositoryAddingEvent` like the rest.
+- GitHub's `ping`, sent when a webhook is created, is answered `200 skipped: ping` without looking for a repository. An organisation's webhook names none, so 3.x answered its ping 400.
+- GitHub deliveries sent as `application/x-www-form-urlencoded` are accepted. 3.x accepted only JSON.
+- `github.source_urls` and `gitea.source_urls` now default to `clone_url`, `ssh_url`, `git_url`, `svn_url`, `html_url`. `html_url` matches a `satis.json` URL written without `.git`, and auto-add takes the first URL a delivery has, which is now the HTTPS clone URL rather than the `git://` one GitHub stopped serving in 2022. A `parameters.yml` that sets either list keeps its own.
+- Gitea's `X-Gitea-Signature` is checked over the body as sent; 3.x trimmed it first. A secret in the payload, which Gogs and older Gitea releases send, is still accepted.
+- Bitbucket Cloud: `BITBUCKET_SECRET` (parameter `bitbucket.secret`) is new. With it set, the delivery's `X-Hub-Signature` is checked and its address is not. Without it, the address must be one of Bitbucket's, as in 3.x, from a list updated to Atlassian's published ranges of 19 October 2026, IPv6 included; 3.x's list lacked ranges Bitbucket sends from. Behind a reverse proxy the address is the proxy's unless `TRUSTED_PROXIES` names it, so set the secret.
+- Bitbucket repositories are found by HTTPS URLs with a user name or without `.git`, by `ssh://git@bitbucket.org/...` URLs, and regardless of case. The `ssh://hg@` pattern is gone; Bitbucket dropped Mercurial in 2020.
+- Azure DevOps: the repository is found by `resource.repository.remoteUrl`, the clone URL. 3.x used `resource.repository.url`, which in Azure DevOps' deliveries is the REST API URL, so no delivery Azure DevOps sends matched a repository. An SSH URL, `git@ssh.dev.azure.com:v3/<organisation>/<project>/<repository>`, matches too. The service hook's "Resource details to send" must stay at its default, All; Minimal and None leave out the repository.
+- Every signature and token is compared in constant time.
+- `WebhookReceivedEvent::getCreatedTag()` reads Bitbucket's `push.changes` and Azure DevOps' `resource.refUpdates`, as well as the `ref` that GitLab, GitHub and Gitea send.
+- For code that extends Satisfy: `GithubWebhook::getResponse()` and `GithubWebhook::createPsr7Request()` are gone, and `AbstractWebhook::verifySignature()` checks an HMAC-SHA256 header. `swop/github-webhook`, `symfony/psr-http-message-bridge` and `laminas/laminas-diactoros` are no longer dependencies.
 
 ## The admin UI's build page
 

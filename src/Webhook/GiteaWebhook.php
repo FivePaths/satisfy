@@ -8,19 +8,20 @@ class GiteaWebhook extends GithubWebhook
 {
     protected function validate(Request $request): void
     {
-        if (!empty($this->secret)) {
-            if ($request->headers->has('X-Gitea-Signature')) {
-                $payload = trim($request->getContent());
-                $signature = hash_hmac('sha256', $payload, $this->secret);
-                if ($signature != $request->headers->get('X-Gitea-Signature')) {
-                    throw new \InvalidArgumentException('Invalid Gitea Signature');
-                }
-            } else {
-                $payload = json_decode($request->getContent());
-                if (!$payload || !isset($payload->secret) || $payload->secret != $this->secret) {
-                    throw new \InvalidArgumentException('Invalid Gitea Signature');
-                }
-            }
+        if (empty($this->secret)) {
+            return;
+        }
+
+        if ($request->headers->has('X-Gitea-Signature')) {
+            $this->verifySignature($request, 'X-Gitea-Signature', '');
+
+            return;
+        }
+
+        // Gogs and older Gitea releases sent the secret in the payload instead.
+        $secret = $this->getPayload($request)['secret'] ?? null;
+        if (!is_string($secret) || !hash_equals($this->secret, $secret)) {
+            throw new \InvalidArgumentException('Invalid Gitea Signature');
         }
     }
 }

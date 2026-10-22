@@ -50,20 +50,57 @@ class WebhookReceivedEvent extends Event
 
     /**
      * The tag this delivery reports as pushed, or null for anything else,
-     * including a deleted tag, whose "after" commit is all zeros.
+     * including a deleted tag. Of several, the first.
      */
     public function getCreatedTag(): ?string
     {
-        $ref = (string) ($this->payload['ref'] ?? '');
-        if (!str_starts_with($ref, 'refs/tags/')) {
-            return null;
+        foreach ($this->getRefUpdates() as [$ref, $deleted]) {
+            if (!$deleted && str_starts_with($ref, 'refs/tags/') && 'refs/tags/' !== $ref) {
+                return substr($ref, strlen('refs/tags/'));
+            }
         }
-        if (!empty($this->payload['deleted']) || preg_match('/^0+$/', (string) ($this->payload['after'] ?? ''))) {
-            return null;
-        }
-        $tag = substr($ref, strlen('refs/tags/'));
 
-        return '' === $tag ? null : $tag;
+        return null;
+    }
+
+    /**
+     * The refs a push delivery updated, each as [ref, deleted], in the shape
+     * each provider sends them.
+     *
+     * @return list<array{string, bool}>
+     */
+    private function getRefUpdates(): array
+    {
+        $updates = [];
+        switch ($this->provider) {
+            case 'bitbucket':
+                // push.changes[]: "new" is null when a ref is deleted.
+                foreach ((array) ($this->payload['push']['changes'] ?? []) as $change) {
+                    $new = $change['new'] ?? null;
+                    if (is_array($new) && is_string($new['name'] ?? null)) {
+                        $prefix = 'tag' === ($new['type'] ?? null) ? 'refs/tags/' : 'refs/heads/';
+                        $updates[] = [$prefix . $new['name'], false];
+                    }
+                }
+                break;
+            case 'devops':
+                // resource.refUpdates[]: newObjectId is all zeros when a ref is deleted.
+                foreach ((array) ($this->payload['resource']['refUpdates'] ?? []) as $update) {
+                    $updates[] = [(string) ($update['name'] ?? ''), self::isNullSha($update['newObjectId'] ?? '')];
+                }
+                break;
+            default:
+                // GitLab, GitHub and Gitea: ref, with "after" all zeros when it is deleted.
+                $deleted = !empty($this->payload['deleted']) || self::isNullSha($this->payload['after'] ?? '');
+                $updates[] = [(string) ($this->payload['ref'] ?? ''), $deleted];
+        }
+
+        return $updates;
+    }
+
+    private static function isNullSha(mixed $sha): bool
+    {
+        return 1 === preg_match('/^0+$/', (string) $sha);
     }
 
     /**
