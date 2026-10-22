@@ -75,6 +75,15 @@ queue_full_build() {
   docker exec -u www-data "$1" sh -c 'printf "{\"repository\":null}" > "$SATISFY_QUEUE_DIR/full.json"'
 }
 
+# Waits for a line matching $1 in the current container's access log.
+logged() {
+  for _ in $(seq 1 10); do
+    grep -qE "$1" <<< "$(docker logs "$name" 2>/dev/null)" && return 0
+    sleep 1
+  done
+  return 1
+}
+
 # Prints the environment of each process in the current container whose
 # command line starts with $1, read as the user it runs as, since a
 # container's root cannot read another user's. "--" starts each one.
@@ -131,6 +140,11 @@ expect 200 /
 expect 404 /packages.json
 expect 404 /index.php
 expect 400 /webhook/gitlab POST
+# Without TRUSTED_PROXIES, X-Forwarded-For is nobody's word.
+curl -s -o /dev/null -H 'X-Forwarded-For: 198.51.100.9' "$base/"
+logged '"GET / HTTP' || fail "the request was not logged"
+grep -qE '^198\.51\.100\.9 ' <<< "$(docker logs "$name" 2>/dev/null)" && fail "X-Forwarded-For was believed without TRUSTED_PROXIES"
+echo "ok   X-Forwarded-For is ignored without TRUSTED_PROXIES"
 # Without a secret, Bitbucket's webhook takes deliveries only from Atlassian's addresses.
 expect 400 /webhook/bitbucket POST
 got="$(curl -s -X POST -H 'X-GitHub-Event: ping' -H 'Content-Type: application/json' \
@@ -185,10 +199,23 @@ start "$prefix-upgrade" -p "127.0.0.1:$port:80" \
   -v "$dir/satis-upgrade.json:/var/www/html/satis.json" \
   -v "$dir/parameters.yml:/var/www/html/config/parameters.yml:ro" \
   -v "$prefix-public:/var/www/html/public" \
-  -e GITLAB_SECRET=smoke "$image"
+  -e GITLAB_SECRET=smoke -e TRUSTED_PROXIES=private_ranges "$image"
 wait_for 200 /login
 expect 200 /login
 expect 302 /admin
+
+# Behind a proxy TRUSTED_PROXIES names, Symfony believes X-Forwarded-Proto and
+# nginx logs the client X-Forwarded-For names.
+redirect() { curl -s -o /dev/null -w '%{redirect_url}' "$@" "$base/admin"; }
+# With a public client address (Symfony's private_ranges include the
+# documentation ranges): PHP must still see the proxy's, or Symfony would not
+# trust the request and would ignore X-Forwarded-Proto.
+[[ "$(redirect -H 'X-Forwarded-Proto: https' -H 'X-Forwarded-For: 1.2.3.4')" == https://* ]] \
+  || fail "X-Forwarded-Proto from a trusted proxy was ignored"
+[[ "$(redirect)" == http://* ]] || fail "/admin redirected to https without X-Forwarded-Proto"
+curl -s -o /dev/null -H 'X-Forwarded-For: 1.2.3.4' "$base/login"
+logged '^1\.2\.3\.4 .*"GET /login' || fail "the client behind a trusted proxy was not logged"
+echo "ok   behind a trusted proxy: https redirects, and the client's address in the log"
 grep -q '"smoke":true' <<< "$(curl -s "$base/packages.json")" || fail "the catalogue in the volume was not kept"
 echo "ok   the old front controller was replaced and the catalogue kept"
 
@@ -226,7 +253,7 @@ echo "-- the authz and hookgate plugins"
 start "$prefix-plugins" -p "127.0.0.1:$port:80" \
   -v "$dir/satis.json:/var/www/html/satis.json" \
   -e SATISFY_PLUGINS=authz,hookgate -e TOKEN_PEPPER=smoke-pepper -e ADMIN_KEY=smoke-admin-key \
-  -e AUTHZ_REALM='Smoke Packages' "$image"
+  -e AUTHZ_REALM='Smoke Packages' -e TRUSTED_PROXIES=private_ranges "$image"
 wait_for 200 /admin
 console() { docker exec -u www-data "$name" php bin/console "$@"; }
 grep -q AutoRequire <<< "$(console debug:event-dispatcher 'Playbloom\Event\WebhookReceivedEvent')" \
@@ -262,6 +289,9 @@ expect 401 /_authzcheck
 expect_as 200 /_authzcheck
 expect 200 /admin
 grep -q 'smoke/other' <<< "$(console authz requests)" || fail "the refused package was not queued for approval"
-echo "ok   authz: tokens, grants, the canary and the approval queue"
+curl -s -o /dev/null -u "smoke-site:$token" -H 'X-Forwarded-For: 1.2.3.4' "$base/p2/smoke/app.json"
+logged '^1\.2\.3\.4 site=smoke-site ' || fail "the access log does not give the client and its site"
+grep -q '"ip":"1.2.3.4"' <<< "$(console authz audit 200)" || fail "authz's audit log does not give the client's address"
+echo "ok   authz: tokens, grants, the canary, the approval queue and the client's address"
 
 echo "smoke test passed"

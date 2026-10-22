@@ -47,7 +47,7 @@ RUN set -eux; \
     chown www-data:www-data /var/www /var/www/html; \
     chmod 0755 /var/www/html; \
     mkdir -p /etc/nginx/satisfy; \
-    touch /etc/nginx/satisfy/server.conf /etc/nginx/satisfy/catalogue.conf; \
+    touch /etc/nginx/satisfy/http.conf /etc/nginx/satisfy/proxy.conf /etc/nginx/satisfy/server.conf /etc/nginx/satisfy/catalogue.conf; \
     chown -R www-data:www-data /etc/nginx/satisfy
 
 USER www-data

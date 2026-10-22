@@ -54,6 +54,12 @@ Without the image:
 - In the image the queue is `/var/www/queue` (`SATISFY_QUEUE_DIR`), a volume of its own, so separate web and worker containers can share it.
 - The image is published to GHCR by `.github/workflows/docker-image.yaml`, after `docker/smoke-test.sh` has passed against it.
 
+## `TRUSTED_PROXIES` is read
+
+`.env` names `TRUSTED_PROXIES`, but before 4.0 nothing read it, so behind a proxy that terminates TLS Satisfy built `http://` URLs, its login redirect among them, unless a mounted configuration file set `framework.trusted_proxies`. 4.0 passes it to Symfony, which then believes `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Port` from those proxies and nobody else. It takes addresses and CIDR ranges, comma-separated, or `private_ranges`, or `REMOTE_ADDR` for whatever connects. A 3.x deployment that set `framework.trusted_proxies` in a mounted `config.yml` for this can drop it.
+
+In the image, nginx reads the same list: behind those proxies, its access log and authz's audit log give the client's address from `X-Forwarded-For` rather than the proxy's. PHP still sees the proxy's address and applies the list itself. An entry that is neither an address nor a range is left out, with a warning at start.
+
 ## `config/parameters.yml` is read again
 
 3.x read `config/parameters.yml` through `config/config.yml`; the move to Symfony Flex on `main` stopped reading it, so a mounted one was silently ignored. 4.0 reads it again, after `config/services.yaml`, so its values override the defaults there, as in 3.x.

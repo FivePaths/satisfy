@@ -142,6 +142,10 @@ volumes:
 
 Share the output directory and the queue between the two, and nothing else under `/var/www/html/var`.
 
+### Behind a reverse proxy
+
+Set `TRUSTED_PROXIES` to the proxy's address or range, such as the Docker network's (`172.18.0.0/16`), or to `private_ranges`. Satisfy then builds `https://` URLs when the proxy sends `X-Forwarded-Proto: https`, and its logs give the client's address from `X-Forwarded-For`.
+
 ## Authors
 
 * Ludovic Fleury - <ludo.fleury@gmail.com> - <http://twitter.com/ludofleury>

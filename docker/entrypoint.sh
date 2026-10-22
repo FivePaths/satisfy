@@ -53,18 +53,52 @@ plugin_enabled() {
   [[ "$list" == *",$1,"* ]]
 }
 
-# The nginx includes for the enabled plugins; empty files otherwise.
+# The nginx includes for the enabled plugins, and the trusted proxies; empty
+# files otherwise.
 configure_nginx() {
   local dir=/etc/nginx/satisfy templates=/usr/local/share/satisfy-nginx realm server
+  : > "$dir/http.conf"
   : > "$dir/server.conf"
   : > "$dir/catalogue.conf"
+  trusted_proxies > "$dir/proxy.conf"
   if plugin_enabled authz; then
+    cp "$templates/authz-http.conf" "$dir/http.conf"
     # The realm Composer and browsers show; quotes and backslashes are dropped.
     realm="$(printf '%s' "${AUTHZ_REALM:-Composer repository}" | tr -d '"\\')"
     server="$(<"$templates/authz-server.conf")"
     printf '%s\n' "${server//@REALM@/$realm}" > "$dir/server.conf"
     cp "$templates/authz-catalogue.conf" "$dir/catalogue.conf"
   fi
+}
+
+# nginx's realip settings for TRUSTED_PROXIES, which Symfony reads too:
+# addresses and CIDR ranges, private_ranges, or REMOTE_ADDR for whatever
+# connects. Anything else is left out, with a warning.
+trusted_proxies() {
+  local entry ranges=() private=() recursive=on
+  local IFS=,
+  for entry in ${TRUSTED_PROXIES:-}; do
+    entry="${entry// /}"
+    case "$entry" in
+      '') ;;
+      private_ranges)
+        # Symfony's own list, so that nginx and Symfony trust the same addresses.
+        read -r -a private <<< "$(php -r 'require $argv[1]; echo implode(",", Symfony\Component\HttpFoundation\IpUtils::PRIVATE_SUBNETS);' "$app/vendor/autoload.php")"
+        ranges+=("${private[@]}") ;;
+      REMOTE_ADDR)
+        # Only the proxy that connected is trusted, so only the address it
+        # added counts: walking further left would believe the client.
+        ranges+=(0.0.0.0/0 ::/0)
+        recursive=off ;;
+      *[!0-9A-Fa-f.:/]*)
+        echo "TRUSTED_PROXIES: ignoring '$entry', which is not an address or range" >&2 ;;
+      *)
+        ranges+=("$entry") ;;
+    esac
+  done
+  [ "${#ranges[@]}" -gt 0 ] || return 0
+  printf 'set_real_ip_from %s;\n' "${ranges[@]}"
+  printf 'real_ip_header X-Forwarded-For;\nreal_ip_recursive %s;\n' "$recursive"
 }
 
 start_web() {

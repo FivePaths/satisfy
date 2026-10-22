@@ -54,6 +54,8 @@ nginx asks `plugins/Authz/public/verify.php` about every catalogue request throu
 | `AUTHZ_REALM` | The realm of the Basic challenge, which helps tell this login from the admin one. Default `Composer repository` |
 | `ENFORCE` | `true` refuses requests without a valid token when the switch file has never been set |
 
+While the plugin is enabled, the image's access log gives each request's principal, as the standalone service's nginx did: `<client> site=<principal> [time] "request" status bytes "user agent"`. Behind a proxy, set `TRUSTED_PROXIES` so that `<client>` and the audit log's `ip` are the client's address, not the proxy's.
+
 `bin/console authz` manages it from the command line, with the subcommands of the former `authzctl`: `issue`, `reissue`, `revoke`, `restore`, `forget`, `list`, `note`, `enforce`, `grant`, `ungrant`, `entitlements`, `pkg-enforce`, `requests`, `approve`, `dismiss`, `check`, `packages`, `deps`, `audit`, `unauth`, `stats` and `selftest`. Run it as `www-data`: `docker exec -u www-data <container> bin/console authz list`. Changes made there reach the web server within 60 seconds, or at once after a purge; changes made in the admin UI take effect at once.
 
 Turn on `admin.auth` in `parameters.yml` when this plugin is enabled: `/admin/authz` issues tokens.
