@@ -78,15 +78,13 @@ You can run satisfy using prebuilt docker image. Here is an example how to setup
 3. Add auth.json with all required composer authentication tokens
 4. Add simple satis.json with basic information
 5. Create docker-compose.yml using example below
-6. Start containers `docker-compose up`
-7. Access container shell `docker-compose exec php bash`
-8. Run initial build `./bin/satis build`
-9. Open satis page on `http://localhost:8000`
+6. Start containers `docker compose up`
+7. Open `http://localhost:8000/admin`, and queue a full build from the build page, or run `docker compose exec -u www-data satisfy bin/console satisfy:rebuild`
+8. Open satis page on `http://localhost:8000`
 
 ```
-version: '3'
 services:
-  php:
+  satisfy:
     image: ghcr.io/project-satisfy/satisfy:latest
     ports:
       - "${APP_PORT:-8000}:80"
@@ -94,10 +92,42 @@ services:
       - ./satis.json:/var/www/html/satis.json
       - ./parameters.yml:/var/www/html/config/parameters.yml
       - ./auth.json:/var/www/.composer/auth.json:ro
-    environment:
-      APP_ENV: ${APP_ENV:-dev}
-      APP_DEBUG: ${APP_DEBUG:-1}
 ```
+
+The image runs nginx, which serves the built catalogue as files; php-fpm, which serves the admin UI and the webhooks; and the worker, which runs the builds that the webhooks and the admin UI queue. The first argument picks what runs: `all` (the default), `web`, `worker`, or `rebuild` to build once and exit.
+
+### Running the web server and the worker apart
+
+Only the worker needs Composer's credentials. Run it in a container of its own, and nothing that answers HTTP requests can read them:
+
+```
+services:
+  web:
+    image: ghcr.io/project-satisfy/satisfy:latest
+    command: web
+    ports:
+      - "${APP_PORT:-8000}:80"
+    volumes:
+      - ./satis.json:/var/www/html/satis.json
+      - ./parameters.yml:/var/www/html/config/parameters.yml
+      - output:/var/www/html/public
+      - queue:/var/www/queue
+  worker:
+    image: ghcr.io/project-satisfy/satisfy:latest
+    command: worker
+    volumes:
+      - ./satis.json:/var/www/html/satis.json
+      - ./parameters.yml:/var/www/html/config/parameters.yml
+      - ./auth.json:/var/www/.composer/auth.json:ro
+      - output:/var/www/html/public
+      - queue:/var/www/queue
+
+volumes:
+  output:
+  queue:
+```
+
+Share the output directory and the queue between the two, and nothing else under `/var/www/html/var`.
 
 ## Authors
 
