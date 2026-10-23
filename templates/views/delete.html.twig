@@ -13,10 +13,8 @@
         </div>
 
         {{ form_errors(form) }}
-        {{ form_widget(form) }}
 
-        <button class="btn btn-large btn-block btn-danger" type="submit" name="delete_form[submit]">
-            Confirm deletion</button>
+        {{ form_widget(form.submit, {label: 'Confirm deletion', attr: {class: 'btn btn-large btn-block btn-danger'}}) }}
         <a href="{{ path('repository') }}" class="btn btn-large btn-block btn-inverse" >Cancel</a>
     {{ form_end(form) }}
 {% endblock %}

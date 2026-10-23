@@ -143,7 +143,7 @@ class FilePersister implements LockablePersisterInterface
         }
 
         $path = rtrim($this->logPath, '/');
-        $name = sprintf('%s.json', date('Y-m-d_his'));
+        $name = sprintf('%s.json', date('Y-m-d_His'));
         $this->filesystem->copy($this->filename, $path . '/' . $name);
     }
 

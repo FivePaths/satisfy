@@ -35,6 +35,10 @@ Without the image:
 - GitLab's `X-Gitlab-Token` is compared in constant time, and the URL a GitLab delivery gives is matched as written; 3.x made a pattern of it with only `.` and `:` escaped.
 - For code that extends Satisfy: `AbstractWebhook::isAuthenticated()`, and `isAuthenticated()` on `WebhookReceivedEvent` and `RepositoryAddingEvent`, which take it as a fourth constructor argument, false when left out.
 
+## Deleting a repository checks the form's token
+
+The delete page's form is checked for its CSRF token, as every other admin form is. 3.x deleted the repository on any `DELETE` request, or `POST` with `_method=DELETE`, which a page on another site could send. `DeleteFormType` now has the `submit` button the page renders.
+
 ## `satis.json` is written under a lock on the file
 
 - Every write takes an exclusive `flock()` on `satis.json` itself, and writes the file in place, so a single-file bind mount keeps pointing at it. 3.x locked a separate file inside the container, which nothing else could take.
@@ -56,7 +60,7 @@ Without the image:
 
 - NGINX Unit is gone. The image is `php:8.4-fpm-bookworm` with nginx, php-fpm and the worker, built from `docker/Dockerfile`. It still listens on port 80 and keeps the application in `/var/www/html`, so the same volume mounts work.
 - The first argument picks what runs: `all` (the default), `web` (nginx and php-fpm), `worker`, or `rebuild` to build once and exit. Anything else runs as given.
-- nginx serves `packages.json`, `p2/`, `include/`, `dist/` and the HTML catalogue from `public/` directly. PHP serves only the admin UI, `/login` and `/webhook/*`.
+- nginx serves `packages.json`, `p2/`, `include/`, `dist/` and the HTML catalogue from `public/` directly. PHP serves only the admin UI, `/login` and `/webhook/*`, and its responses carry `X-Frame-Options: DENY` and `X-Content-Type-Options: nosniff`.
 - nginx and php-fpm start without `COMPOSER_AUTH`; only the worker gets it. A Composer `auth.json` mounted into `/var/www/.composer` is still readable by every process in the container, so mount it into a separate worker container if that matters to you (README, "Running the web server and the worker apart").
 - The configuration is compiled afresh on every start, so a changed `parameters.yml` or environment takes effect without `cache:clear`.
 - If `public/` is a volume, the entrypoint copies the image's `index.php` and assets back into it on every start, because a volume keeps whatever image first filled it, and 3.x's `index.php` does not run on 4.0. The catalogue's files are not touched. Set `SATISFY_SYNC_PUBLIC=0` to stop it, as `docker-compose.yml` does for development.

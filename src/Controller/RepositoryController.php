@@ -136,8 +136,11 @@ class RepositoryController extends AbstractProtectedController
             return $this->redirectToRoute('repository');
         }
 
+        // Submitted only by a DELETE, or a POST with _method=DELETE, carrying
+        // the form's CSRF token: a cross-site form can send the method, not the token.
         $form = $this->createForm(DeleteFormType::class);
-        if (Request::METHOD_DELETE === $request->getMethod()) {
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
             try {
                 $this->manager->delete($repository);
                 $this->addFlash('success', 'Repository removed successfully');
