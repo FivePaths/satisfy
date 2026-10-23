@@ -162,10 +162,15 @@ class WebhookProvidersTest extends TestCase
         $manager->add(Argument::that(fn (Repository $r) => 'https://github.com/example-org/widget.git' === $r->getUrl()))
             ->shouldBeCalledOnce();
         $webhook = new GithubWebhook($manager->reveal(), $this->dispatcher());
+        $webhook->setSecret(self::SECRET);
         $webhook->setAutoAdd(true);
         $webhook->setAutoAddType('vcs');
 
-        $response = $webhook->getResponse($this->request($this->fixture('github-push-tag.json'), ['X-GitHub-Event' => 'push']));
+        $body = $this->fixture('github-push-tag.json');
+        $response = $webhook->getResponse($this->request($body, [
+            'X-GitHub-Event' => 'push',
+            'X-Hub-Signature-256' => 'sha256=' . hash_hmac('sha256', $body, self::SECRET),
+        ]));
 
         $this->assertSame(202, $response->getStatusCode());
     }

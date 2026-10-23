@@ -94,7 +94,9 @@ class GithubWebhookTest extends TestCase
             ->shouldBeCalledTimes(1);
 
         $request = self::createRequest(file_get_contents(__DIR__ . '/../fixtures/github-push.json'));
+        $request->headers->set('X-Hub-Signature-256', 'sha256=' . hash_hmac('sha256', $request->getContent(), 'secret'));
         $handler = new GithubWebhook($manager->reveal(), $dispatcher->reveal());
+        $handler->setSecret('secret');
         $handler->setAutoAdd(true);
         $handler->setAutoAddType('github');
         $response = $handler->getResponse($request);

@@ -36,6 +36,15 @@ abstract class AbstractWebhook
     }
 
     /**
+     * Whether deliveries are checked against a secret. Without one, anyone
+     * who can reach the webhook can send one.
+     */
+    public function isAuthenticated(): bool
+    {
+        return null !== $this->secret && '' !== $this->secret;
+    }
+
+    /**
      * The provider's name, as in the webhook's path: gitlab, github, gitea, bitbucket or devops.
      */
     public function getProvider(): string
@@ -52,7 +61,7 @@ abstract class AbstractWebhook
         try {
             $this->validate($request);
 
-            $received = new WebhookReceivedEvent($this->getProvider(), $request, $this->getPayload($request));
+            $received = new WebhookReceivedEvent($this->getProvider(), $request, $this->getPayload($request), $this->isAuthenticated());
             $this->dispatcher->dispatch($received);
             if (null !== $response = $received->getResponse()) {
                 return $response;
@@ -113,12 +122,17 @@ abstract class AbstractWebhook
 
     /**
      * Auto-adds a repository a delivery named, unless a listener refuses it.
+     * Only a delivery checked against a secret can: otherwise anyone could add
+     * a repository of theirs, and publish its packages from this catalogue.
      *
      * @throws WebhookSkippedException
      */
     protected function addRepository(RepositoryInterface $repository, Request $request): void
     {
-        $event = new RepositoryAddingEvent($repository, $this->getProvider(), $this->getPayload($request));
+        if (!$this->isAuthenticated()) {
+            throw new WebhookSkippedException('auto-add needs the webhook\'s secret to be set');
+        }
+        $event = new RepositoryAddingEvent($repository, $this->getProvider(), $this->getPayload($request), true);
         $this->dispatcher->dispatch($event);
         if ($event->isRefused()) {
             throw new WebhookSkippedException((string) $event->getRefusal());

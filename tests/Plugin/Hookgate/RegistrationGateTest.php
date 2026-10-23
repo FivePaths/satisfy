@@ -63,17 +63,26 @@ class RegistrationGateTest extends HookgateTestCase
         $this->assertSame(['registered_no_api_token'], $this->decisions());
     }
 
+    public function testAnUnauthenticatedDeliveryIsRefusedBeforeGitLabIsAsked(): void
+    {
+        $event = $this->check([self::PROJECT => [200, '{"default_branch": "main"}']], true, false);
+
+        $this->assertTrue($event->isRefused());
+        $this->assertSame(['skipped_unauthenticated'], $this->decisions());
+    }
+
     /**
      * @param array<string, array{0: int, 1: string}> $responses
      */
-    private function check(array $responses, bool $token = true): RepositoryAddingEvent
+    private function check(array $responses, bool $token = true, bool $authenticated = true): RepositoryAddingEvent
     {
         $config = $this->createConfig();
         $gate = new RegistrationGate($this->createHttp($config, $responses, false, $token), new PackageTypes($config), $this->createLog());
         $event = new RepositoryAddingEvent(
             new Repository('https://git.example.com/acme/thing.git', 'vcs'),
             'gitlab',
-            ['project' => ['path_with_namespace' => 'acme/thing']]
+            ['project' => ['path_with_namespace' => 'acme/thing']],
+            $authenticated
         );
         $gate->onRepositoryAdding($event);
 

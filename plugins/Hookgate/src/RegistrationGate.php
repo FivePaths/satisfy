@@ -36,6 +36,13 @@ final class RegistrationGate implements EventSubscriberInterface
             return;
         }
         $url = $event->getRepository()->getUrl();
+        // The URL picks the host the API token is sent to: only GitLab may name it.
+        if (!$event->isAuthenticated()) {
+            $this->log->write('skipped_unauthenticated', ['url' => $url]);
+            $event->refuse('the delivery was not checked against a secret');
+
+            return;
+        }
         if (!$this->http->hasApiToken()) {
             $this->log->write('registered_no_api_token', ['url' => $url]);
 

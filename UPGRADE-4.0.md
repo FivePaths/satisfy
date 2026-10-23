@@ -11,11 +11,12 @@ With the Docker image:
 3. If anything reads a webhook's response to learn whether the build passed, have it read the worker's output or `var/log/build.log` instead.
 4. If Bitbucket's webhook reaches Satisfy through a reverse proxy, set `BITBUCKET_SECRET` and give the webhook the same secret.
 5. If another program writes `satis.json`, have it take an exclusive `flock()` on the file and write it in place.
+6. If a webhook auto-adds repositories (`*.auto_add_repo`), set its secret: 4.0 auto-adds only for deliveries checked against one.
 
 Without the image:
 
 1. Run PHP 8.4 or later, then `composer install`.
-2. Steps 2 to 5 above.
+2. Steps 2 to 6 above.
 3. Run `bin/console satisfy:worker` as a service, as the user the web server runs as, or from cron with `--once`. Nothing builds without it.
 4. Point the web server's document root at `public/` as before. Serving `packages.json`, `p2/`, `include/` and `dist/` as static files, as the image's `docker/nginx.conf` does, keeps PHP out of Composer's requests.
 
@@ -24,8 +25,15 @@ Without the image:
 - `SATISFY_PLUGINS` enables plugins, comma-separated; none by default. Two ship with 4.0: `authz` (per-token access with per-package grants) and `hookgate` (a registration gate and auto-require for GitLab system hooks). Each has a README in `plugins/<Name>/`, which also says how to move from the standalone service it replaces; `docs/plugins.md` describes plugins in general.
 - With the image, enabling `authz` puts the catalogue behind `auth_request`: everything nginx serves from `public/` except the admin UI, its assets, `/login` and the webhooks, so that a file Satis writes outside `packages.json`, `p2/`, `include/` and `dist/` is not served to everyone. Nothing changes while it is not enabled.
 - `authz` reads the package a request is for from the path nginx serves the file from, dot segments and repeated slashes resolved, and refuses a path it cannot read for certain while enforcement is on.
+- `hookgate` acts only on deliveries checked against `GITLAB_SECRET`. Without it, the project URL a delivery gives would pick the host its API token is sent to.
 - A webhook delivery that a plugin skips, or whose auto-add a plugin refuses, is answered 200 with `skipped: <reason>`.
 - For code that extends Satisfy: two new events, `WebhookReceivedEvent` and `RepositoryAddingEvent`; `AbstractWebhook::addRepository()` dispatches the second before an auto-add, and the GitLab, GitHub and Gitea webhooks use it. `Manager::modify()` applies a change to `satis.json` under the lock, and `JsonPersister::serialize()` gives the JSON a flush would write.
+
+## Auto-add needs the webhook's secret
+
+- `gitlab.auto_add_repo`, `github.auto_add_repo` and `gitea.auto_add_repo` add a repository only for a delivery checked against the webhook's secret: `GITLAB_SECRET`, `GITHUB_SECRET` or `GITEA_SECRET`. Without one, anyone who could reach the webhook could add a repository of theirs to `satis.json`, and the catalogue would publish its packages. Such a delivery for a repository `satis.json` does not list is answered `200 skipped: auto-add needs the webhook's secret to be set`.
+- GitLab's `X-Gitlab-Token` is compared in constant time, and the URL a GitLab delivery gives is matched as written; 3.x made a pattern of it with only `.` and `:` escaped.
+- For code that extends Satisfy: `AbstractWebhook::isAuthenticated()`, and `isAuthenticated()` on `WebhookReceivedEvent` and `RepositoryAddingEvent`, which take it as a fourth constructor argument, false when left out.
 
 ## `satis.json` is written under a lock on the file
 

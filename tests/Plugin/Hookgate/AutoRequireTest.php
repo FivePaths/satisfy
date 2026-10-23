@@ -106,6 +106,23 @@ class AutoRequireTest extends HookgateTestCase
         $this->assertNull($this->queue()->claim(), 'A repository not in the catalogue was queued');
     }
 
+    /**
+     * Without GITLAB_SECRET anyone could send the delivery, and the project URL
+     * in it picks the host the API token goes to.
+     */
+    public function testAnUnauthenticatedDeliveryIsRefusedBeforeGitLabIsAsked(): void
+    {
+        $before = file_get_contents($this->satisFile());
+        $autoRequire = $this->createAutoRequire('observe', $this->package('acme/thing'));
+        $event = $this->receive($autoRequire, false);
+        $autoRequire->onTerminate();
+
+        $this->assertNull($event->getResponse());
+        $this->assertSame(['auto_require_refused'], $this->decisions());
+        $this->assertSame('unauthenticated', $this->logged[0]['fields']['reason']);
+        $this->assertSame($before, file_get_contents($this->satisFile()));
+    }
+
     public function testDeliveriesThatAreNotGitLabTagPushesAreIgnored(): void
     {
         $autoRequire = $this->createAutoRequire('on', $this->package('acme/thing'));
@@ -164,14 +181,14 @@ class AutoRequireTest extends HookgateTestCase
         ];
     }
 
-    private function receive(AutoRequire $autoRequire): WebhookReceivedEvent
+    private function receive(AutoRequire $autoRequire, bool $authenticated = true): WebhookReceivedEvent
     {
         $event = new WebhookReceivedEvent('gitlab', Request::create('/'), [
             'object_kind' => 'tag_push',
             'ref' => 'refs/tags/1.0.0',
             'after' => 'b5f1b6a8',
             'project' => $this->project(),
-        ]);
+        ], $authenticated);
         $autoRequire->onWebhookReceived($event);
 
         return $event;

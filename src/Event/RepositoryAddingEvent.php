@@ -20,6 +20,7 @@ class RepositoryAddingEvent extends Event
         private readonly RepositoryInterface $repository,
         private readonly string $provider,
         private readonly array $payload,
+        private readonly bool $authenticated = false,
     ) {
     }
 
@@ -31,6 +32,15 @@ class RepositoryAddingEvent extends Event
     public function getProvider(): string
     {
         return $this->provider;
+    }
+
+    /**
+     * Whether the delivery was checked against the webhook's secret; see
+     * WebhookReceivedEvent::isAuthenticated().
+     */
+    public function isAuthenticated(): bool
+    {
+        return $this->authenticated;
     }
 
     /**

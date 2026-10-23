@@ -47,7 +47,9 @@ class Http
 
     /**
      * Redirects are followed, GitLab answering 301 for a moved project, but
-     * only on the same host, since the request may carry a token.
+     * only to the same scheme, host and port, since the request may carry a
+     * token. They are followed here rather than by curl, which would send the
+     * token to wherever a redirect pointed before it could be checked.
      *
      * @param string[] $headers
      *
@@ -55,23 +57,42 @@ class Http
      */
     private static function get(string $url, array $headers): array
     {
-        $handle = curl_init($url);
-        curl_setopt_array($handle, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 10,
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 3,
-        ]);
-        $body = curl_exec($handle);
-        $status = false === $body ? 0 : (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
-        $landed = (string) curl_getinfo($handle, CURLINFO_EFFECTIVE_URL);
-        curl_close($handle);
-        if (parse_url($landed, PHP_URL_HOST) !== parse_url($url, PHP_URL_HOST)) {
-            return [0, ''];
+        $origin = self::origin($url);
+        for ($redirects = 0; $redirects <= 3; ++$redirects) {
+            $handle = curl_init($url);
+            curl_setopt_array($handle, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_FOLLOWLOCATION => false,
+            ]);
+            $body = curl_exec($handle);
+            $status = false === $body ? 0 : (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+            $next = (string) curl_getinfo($handle, CURLINFO_REDIRECT_URL);
+            curl_close($handle);
+
+            if ('' === $next || $status < 300 || $status >= 400) {
+                return [$status, false === $body ? '' : (string) $body];
+            }
+            if (self::origin($next) !== $origin) {
+                return [0, ''];
+            }
+            $url = $next;
         }
 
-        return [$status, false === $body ? '' : (string) $body];
+        return [0, ''];
+    }
+
+    /**
+     * scheme://host:port, with the scheme's default port when none is given.
+     */
+    private static function origin(string $url): string
+    {
+        $parts = parse_url($url);
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        $port = $parts['port'] ?? ('https' === $scheme ? 443 : 80);
+
+        return sprintf('%s://%s:%d', $scheme, strtolower((string) ($parts['host'] ?? '')), $port);
     }
 }

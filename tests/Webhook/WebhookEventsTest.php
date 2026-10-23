@@ -21,6 +21,8 @@ class WebhookEventsTest extends TestCase
 {
     use ProphecyTrait;
 
+    private const SECRET = 'secret';
+
     public function testAListenerCanSkipADelivery(): void
     {
         $dispatcher = new EventDispatcher();
@@ -77,7 +79,7 @@ class WebhookEventsTest extends TestCase
             $event->refuse('declares type "project"');
         });
 
-        $webhook = new GitlabWebhook($manager->reveal(), $dispatcher, null, true, 'vcs');
+        $webhook = new GitlabWebhook($manager->reveal(), $dispatcher, self::SECRET, true, 'vcs');
         $response = $webhook->getResponse($this->createRequest(['ref' => 'refs/heads/main']));
 
         $this->assertSame(200, $response->getStatusCode());
@@ -93,10 +95,26 @@ class WebhookEventsTest extends TestCase
         $dispatcher = new EventDispatcher();
         $dispatcher->addListener(BuildEvent::class, fn (BuildEvent $event) => $event->markQueued());
 
-        $webhook = new GitlabWebhook($manager->reveal(), $dispatcher, null, true, 'vcs');
+        $webhook = new GitlabWebhook($manager->reveal(), $dispatcher, self::SECRET, true, 'vcs');
         $response = $webhook->getResponse($this->createRequest(['ref' => 'refs/heads/main']));
 
         $this->assertSame(202, $response->getStatusCode());
+    }
+
+    public function testListenersAreToldWhetherTheDeliveryWasCheckedAgainstASecret(): void
+    {
+        $seen = [];
+        $dispatcher = new EventDispatcher();
+        $dispatcher->addListener(WebhookReceivedEvent::class, function (WebhookReceivedEvent $event) use (&$seen): void {
+            $seen[] = $event->isAuthenticated();
+            $event->skip('seen');
+        });
+        $manager = $this->prophesize(Manager::class)->reveal();
+
+        (new GitlabWebhook($manager, $dispatcher, self::SECRET))->getResponse($this->createRequest([]));
+        (new GitlabWebhook($manager, $dispatcher))->getResponse(Request::create('/webhook/gitlab', 'POST', [], [], [], [], '{}'));
+
+        $this->assertSame([true, false], $seen);
     }
 
     private function createWebhook(EventDispatcher $dispatcher): GitlabWebhook
@@ -104,13 +122,13 @@ class WebhookEventsTest extends TestCase
         $manager = $this->prophesize(Manager::class);
         $manager->findByUrl(Argument::any())->willReturn(new Repository('https://git.example.com/site/scaffold.git'));
 
-        return new GitlabWebhook($manager->reveal(), $dispatcher);
+        return new GitlabWebhook($manager->reveal(), $dispatcher, self::SECRET);
     }
 
     private function createRequest(array $payload): Request
     {
         $payload['project'] = ['git_http_url' => 'https://git.example.com/site/scaffold.git'];
 
-        return Request::create('/webhook/gitlab', 'POST', [], [], [], [], (string) json_encode($payload));
+        return Request::create('/webhook/gitlab', 'POST', [], [], [], ['HTTP_X_GITLAB_TOKEN' => self::SECRET], (string) json_encode($payload));
     }
 }

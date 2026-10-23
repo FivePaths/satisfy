@@ -27,10 +27,12 @@ A service implementing `Playbloom\Plugin\AdminLinkInterface` adds buttons to the
 | Event | Dispatched | A listener can |
 |---|---|---|
 | `WebhookReceivedEvent` | For every webhook delivery that passed its secret check, before the repository is looked up | `skip()` it (200) or `accept()` it (202) and do the work itself, for example on `kernel.terminate` once the response has gone |
-| `RepositoryAddingEvent` | Before a webhook auto-adds a repository it does not know | `refuse()` it; the delivery is answered 200 and nothing is written |
+| `RepositoryAddingEvent` | Before a webhook auto-adds a repository it does not know, which it does only for a delivery checked against its secret | `refuse()` it; the delivery is answered 200 and nothing is written |
 | `BuildEvent` | A webhook or the admin UI asks for a build | Stop it before the queue sees it |
 | `BuildStartingEvent` | The worker is about to run Satis | `cancel()` the build |
 | `BuildFinishedEvent` | Satis has exited | Read the exit code |
+
+A webhook whose secret is not set passes every delivery, so anyone who can reach it can send one. `isAuthenticated()` on both webhook events says whether the delivery was checked against a secret; a listener that writes `satis.json` or sends a credential somewhere the delivery names should do nothing when it is false.
 
 In the image with `authz` enabled, a request for anything but `/admin`, `/login`, `/webhook/` and the admin UI's assets passes the catalogue's check before it reaches PHP, so a plugin's routes belong under `/admin`.
 

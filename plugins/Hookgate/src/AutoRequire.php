@@ -68,6 +68,13 @@ final class AutoRequire implements EventSubscriberInterface
         }
 
         $log = ['project' => $path, 'tag' => $tag, 'mode' => $mode];
+        // The project's URL picks the host the API token is sent to, and the
+        // repository written to satis.json: only GitLab may name it.
+        if (!$event->isAuthenticated()) {
+            $this->log->write('auto_require_refused', $log + ['reason' => 'unauthenticated']);
+
+            return;
+        }
         if (!$this->http->hasApiToken()) {
             $this->log->write('auto_require_refused', $log + ['reason' => 'no_api_token']);
 

@@ -80,15 +80,16 @@ class GitlabWebhook extends AbstractWebhook
 
     protected function getUrlPattern(string $url): string
     {
-        $pattern = '#^' . $url . '$#';
-        $pattern = str_replace(['.', ':'], ['\.', '\:'], $pattern);
-
-        return $pattern;
+        return '#^' . preg_quote($url, '#') . '$#';
     }
 
     protected function validate(Request $request): void
     {
-        if ($request->headers->get(self::HTTP_TOKEN) !== $this->secret) {
+        $token = $request->headers->get(self::HTTP_TOKEN);
+        $matches = null === $token || null === $this->secret
+            ? $token === $this->secret
+            : hash_equals($this->secret, $token);
+        if (!$matches) {
             throw new \InvalidArgumentException('Invalid Token');
         }
     }

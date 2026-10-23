@@ -24,6 +24,7 @@ class WebhookReceivedEvent extends Event
         private readonly string $provider,
         private readonly Request $request,
         private readonly array $payload,
+        private readonly bool $authenticated = false,
     ) {
     }
 
@@ -33,6 +34,16 @@ class WebhookReceivedEvent extends Event
     public function getProvider(): string
     {
         return $this->provider;
+    }
+
+    /**
+     * Whether the delivery was checked against the webhook's secret. Without
+     * one, anyone who can reach the webhook could have sent it, and what it
+     * names, URLs and hosts included, is theirs to choose.
+     */
+    public function isAuthenticated(): bool
+    {
+        return $this->authenticated;
     }
 
     public function getRequest(): Request

@@ -41,7 +41,7 @@ It refuses:
 | `HOOKGATE_CHECKER` | A command that checks a candidate `satis.json` before auto-require writes it. It gets `SATIS_JSON`, `SATIS_CHECK_SCOPE=file`, `GITLAB_API_TOKEN`, `GITLAB_API_BASE` and `PACKAGE_TYPES_FILE`; exit 0 or 4 lets the write go ahead, anything else refuses |
 | `HOOKGATE_DRUPAL_ORG_P2` | Where to ask whether drupal.org serves a `drupal/` name. Default `https://packages.drupal.org/files/packages/8/p2` |
 
-The webhook itself is Satisfy's: `GITLAB_SECRET` checks `X-Gitlab-Token`, and `gitlab.auto_add_repo` turns auto-add on.
+The webhook itself is Satisfy's: `GITLAB_SECRET` checks `X-Gitlab-Token`, and `gitlab.auto_add_repo` turns auto-add on. Set `GITLAB_SECRET`: without it both parts stand aside, since anyone could send the delivery, and the project URL in it picks the host the API token is sent to and the repository written to `satis.json`. Satisfy itself auto-adds nothing without it.
 
 ## Decisions
 
@@ -56,6 +56,7 @@ docker logs <container> 2>&1 | grep -E 'registered_|skipped_|auto_require'
 | `registered_new_package` | The gate found a published type; the repository is added |
 | `registered_undetermined` | GitLab did not answer clearly; added, failing open |
 | `registered_no_api_token` | No token to ask GitLab with; added |
+| `skipped_unauthenticated` | The delivery was not checked against `GITLAB_SECRET`; refused without asking GitLab |
 | `registered_unparseable_url` | The project's path could not be read from the delivery; added |
 | `skipped_not_a_package` | No branch or tag has a `composer.json`; refused |
 | `skipped_type_project` | The `composer.json` declares `project`; refused |
@@ -63,7 +64,7 @@ docker logs <container> 2>&1 | grep -E 'registered_|skipped_|auto_require'
 | `auto_require_would_add` | In observe mode: what on would have added |
 | `auto_require_added` | In on mode: added to `satis.json` |
 | `auto_require_skipped` | Not published, for an expected reason: `project`, Drupal 7, served by drupal.org, or blacklisted |
-| `auto_require_refused` | Not published, for any other reason, which the line gives |
+| `auto_require_refused` | Not published, for any other reason, which the line gives; `unauthenticated` when `GITLAB_SECRET` is not set |
 | `auto_require_replanned` | `satis.json` changed while it was checking; it planned again |
 | `auto_require_error` | It failed; the line gives the error |
 

@@ -80,7 +80,7 @@ A delivery for a repository in `satis.json` queues a build of that repository, a
 | Bitbucket Cloud | `/webhook/bitbucket` | `BITBUCKET_SECRET` | `X-Hub-Signature`; without a secret, Atlassian's published addresses |
 | Azure DevOps | `/webhook/devops` | `DEVOPS_SECRET` | An `X-DEVOPS-TOKEN` header added under the service hook's "HTTP headers"; "Resource details to send" must be All |
 
-GitLab, GitHub and Gitea can also add a repository `satis.json` does not list yet: see the `*.auto_add_repo` parameters in `config/services.yaml`.
+GitLab, GitHub and Gitea can also add a repository `satis.json` does not list yet: see the `*.auto_add_repo` parameters in `config/services.yaml`. They do so only with the webhook's secret set, since otherwise anyone who can reach the webhook could add a repository of theirs.
 
 ## Prebuilt docker image
 
