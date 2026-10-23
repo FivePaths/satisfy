@@ -70,6 +70,38 @@ class VerifierTest extends TestCase
         $this->assertSame(['acme/other'], array_column($requests, 'package'));
     }
 
+    /**
+     * nginx passes $request_uri as sent and serves the file its normalized
+     * path names; the package checked must be that file's.
+     *
+     * @dataProvider otherWaysToWriteAPath
+     */
+    public function testAPackagePathWrittenAnotherWayIsCheckedAsTheFileNginxServes(string $uri): void
+    {
+        $this->assertSame(403, $this->decide($this->header, $uri));
+    }
+
+    public static function otherWaysToWriteAPath(): iterable
+    {
+        yield 'dot-dot segment' => ['/p2/acme/x/../other.json'];
+        yield 'dot segment' => ['/./p2/acme/other.json'];
+        yield 'leading double slash' => ['//p2/acme/other.json'];
+        yield 'double slash in dist' => ['/dist//acme/other/acme-other-1.0.0.zip'];
+        yield 'encoded slash and dots' => ['/p2/acme/x%2f..%2fother.json'];
+        yield 'through the canary' => ['/_authzcheck/../p2/acme/other.json'];
+        yield 'fragment' => ['/p2/acme/app.json#/../other.json'];
+        yield 'encoded question mark' => ['/p2/acme/app.json%3F/../other.json'];
+        yield 'above the root' => ['/../p2/acme/other.json'];
+        yield 'Composer 1 provider file' => ['/p/acme/other$0123abcd.json'];
+    }
+
+    public function testAPathThatCannotBeReadIsAllowedWhileEnforcementIsOff(): void
+    {
+        $this->config->setEnforcing(false);
+
+        $this->assertSame(200, $this->decide($this->header, '/p2/acme/app.json#/../other.json'));
+    }
+
     public function testAWrongOrMissingTokenIsRefused(): void
     {
         $this->assertSame(401, $this->decide('Basic ' . base64_encode('site-a:wrong'), '/packages.json'));

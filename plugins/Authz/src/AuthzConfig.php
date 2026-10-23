@@ -23,7 +23,7 @@ final class AuthzConfig
     public const DEPS_TTL = 900;
 
     /**
-     * Requests under this prefix always enforce, whatever the global flag says,
+     * Requests for this path always enforce, whatever the global flag says,
      * so the whole nginx to PHP chain can be proven while enforcement is off.
      */
     public const CANARY_PREFIX = '/_authzcheck';

@@ -40,9 +40,16 @@ final class Cache
         }
     }
 
+    /**
+     * Drops what a change to sites or grants makes stale: verified
+     * credentials, entitlements, and the flags that keep the approval queue
+     * from being written on every request. The dependency graph and the audit
+     * summary are kept, since no grant changes them and both cost a full read
+     * to build again; so is everything else in the pool's APCu.
+     */
     public static function clear(): bool
     {
-        return self::enabled() && apcu_clear_cache();
+        return self::enabled() && apcu_delete(new \APCUIterator('/^authz:(?!deps:|audit:)/', APC_ITER_KEY));
     }
 
     public static function enabled(): bool

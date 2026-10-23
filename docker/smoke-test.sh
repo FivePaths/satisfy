@@ -288,6 +288,30 @@ expect_as 403 /p2/smoke/other.json
 expect 401 /_authzcheck
 expect_as 200 /_authzcheck
 expect 200 /admin
+expect 200 /login
+expect 200 /images/favicon.ico
+
+# A package's path written another way is checked as the file nginx serves.
+expect_as_sent() {
+  local want="$1" path="$2" got
+  got="$(curl -s --path-as-is -o /dev/null -w '%{http_code}' -u "smoke-site:$token" "$base$path")"
+  [ "$got" = "$want" ] || fail "GET $path as sent, with the site's token, answered $got, expected $want"
+  echo "ok   GET $path as sent, as smoke-site -> $got"
+}
+expect_as_sent 200 /p2/smoke/x/../app.json
+expect_as_sent 403 /p2/smoke/x/../other.json
+expect_as_sent 403 //p2/smoke/other.json
+expect_as_sent 403 /_authzcheck/../p2/smoke/other.json
+
+# Files Satis writes outside the usual layout are behind the check too.
+docker exec -u www-data "$name" sh -c '
+  mkdir -p public/p/smoke public/archives
+  printf "{}" > "public/p/smoke/other\$0123abcd.json"
+  printf "zip" > public/archives/smoke-other.zip'
+expect 401 '/p/smoke/other$0123abcd.json'
+expect_as 403 '/p/smoke/other$0123abcd.json'
+expect 401 /archives/smoke-other.zip
+expect_as 200 /archives/smoke-other.zip
 grep -q 'smoke/other' <<< "$(console authz requests)" || fail "the refused package was not queued for approval"
 curl -s -o /dev/null -u "smoke-site:$token" -H 'X-Forwarded-For: 1.2.3.4' "$base/p2/smoke/app.json"
 logged '^1\.2\.3\.4 site=smoke-site ' || fail "the access log does not give the client and its site"

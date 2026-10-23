@@ -40,7 +40,9 @@ final class Verifier
      */
     public function decide(string $header, string $uri, string $ip): array
     {
-        $canary = str_starts_with($uri, AuthzConfig::CANARY_PREFIX);
+        // Read as nginx read it to find the file: the URI is $request_uri, as sent.
+        $path = Uri::path($uri);
+        $canary = AuthzConfig::CANARY_PREFIX === $path;
         $enforce = $canary || $this->config->isEnforcing();
 
         $site = $this->token->verify($header);
@@ -54,7 +56,13 @@ final class Verifier
 
         $package = null;
         $packageOutcome = null;
-        if ($authorized && !$canary) {
+        if ($authorized && null === $path && $enforce) {
+            // Composer never sends a path that cannot be read for certain, and
+            // the package it names could not be checked.
+            $allow = false;
+            $status = 403;
+            $reason = 'uri';
+        } elseif ($authorized && !$canary) {
             $package = Uri::package($uri);
             if (null !== $package) {
                 $packageOutcome = $this->entitlement->check($site, $package);

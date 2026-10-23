@@ -22,7 +22,8 @@ Without the image:
 ## Plugins
 
 - `SATISFY_PLUGINS` enables plugins, comma-separated; none by default. Two ship with 4.0: `authz` (per-token access with per-package grants) and `hookgate` (a registration gate and auto-require for GitLab system hooks). Each has a README in `plugins/<Name>/`, which also says how to move from the standalone service it replaces; `docs/plugins.md` describes plugins in general.
-- With the image, enabling `authz` puts the catalogue behind `auth_request`; nothing changes while it is not enabled.
+- With the image, enabling `authz` puts the catalogue behind `auth_request`: everything nginx serves from `public/` except the admin UI, its assets, `/login` and the webhooks, so that a file Satis writes outside `packages.json`, `p2/`, `include/` and `dist/` is not served to everyone. Nothing changes while it is not enabled.
+- `authz` reads the package a request is for from the path nginx serves the file from, dot segments and repeated slashes resolved, and refuses a path it cannot read for certain while enforcement is on.
 - A webhook delivery that a plugin skips, or whose auto-add a plugin refuses, is answered 200 with `skipped: <reason>`.
 - For code that extends Satisfy: two new events, `WebhookReceivedEvent` and `RepositoryAddingEvent`; `AbstractWebhook::addRepository()` dispatches the second before an auto-add, and the GitLab, GitHub and Gitea webhooks use it. `Manager::modify()` applies a change to `satis.json` under the lock, and `JsonPersister::serialize()` gives the JSON a flush would write.
 

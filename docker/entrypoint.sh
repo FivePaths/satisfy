@@ -63,8 +63,10 @@ configure_nginx() {
   trusted_proxies > "$dir/proxy.conf"
   if plugin_enabled authz; then
     cp "$templates/authz-http.conf" "$dir/http.conf"
-    # The realm Composer and browsers show; quotes and backslashes are dropped.
-    realm="$(printf '%s' "${AUTHZ_REALM:-Composer repository}" | tr -d '"\\')"
+    # The realm Composer and browsers show. Quotes, backslashes, "$" and line
+    # breaks are dropped: inside nginx's quoted string they would end it, or
+    # name a variable.
+    realm="$(printf '%s' "${AUTHZ_REALM:-Composer repository}" | tr -d "\"'\\\\\$\r\n")"
     server="$(<"$templates/authz-server.conf")"
     printf '%s\n' "${server//@REALM@/$realm}" > "$dir/server.conf"
     cp "$templates/authz-catalogue.conf" "$dir/catalogue.conf"

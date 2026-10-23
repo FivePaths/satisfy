@@ -7,18 +7,18 @@ Each principal, such as a site or a developer's laptop, holds a token, which Com
 - **The credential.** While enforcement is on, every catalogue request needs a valid token. While it is off, requests are allowed and recorded, so the consumers are known before anything is refused.
 - **The package.** A principal under package enforcement may fetch only the packages it is granted and everything they require, and gets 403 for the rest. A grant of `vendor/name` or `vendor/*` implies the granted packages' requirements, computed from the catalogue's `p2/` metadata, so nobody keeps a list of dependencies. A refused package is recorded for approval. In observe mode the request is allowed and recorded all the same.
 
-Whole-catalogue documents (`/`, `/index.html`, `/packages.json`, `/include/`) need only the credential.
+Whole-catalogue documents (`/`, `/index.html`, `/packages.json`, `/include/`, and Composer 1's `/p/provider-*.json`) need only the credential. A package is read from the path nginx serves the file from, so `/p2/x/../vendor/name.json` and `//p2/vendor/name.json` are checked as `vendor/name`; a path that cannot be read for certain, with a `#`, an encoded `?`, a backslash or `..` above the root, is refused while enforcement is on.
 
 ## How it attaches
 
 nginx asks `public/verify.php` about every catalogue request through `auth_request`. That endpoint runs without Symfony's kernel, because Composer calls it for every file of every update, and caches its answers in APCu for 60 seconds and the dependency graph for 15 minutes. Tokens are hashed with SHA-256 and `TOKEN_PEPPER` and compared in constant time.
 
-In the Docker image the entrypoint wires it up whenever the plugin is enabled: `auth_request` on `packages.json`, `p2/`, `include/`, `dist/` and the HTML catalogue, the endpoints below, and an access log that gives each request's principal. Outside the image, take the nginx configuration from `docker/nginx/authz-server.conf`, `authz-catalogue.conf` and `authz-http.conf`. nginx has to pass the `Authorization` header, the original URI and the client's address to `verify.php` explicitly, and php-fpm needs APCu.
+In the Docker image the entrypoint wires it up whenever the plugin is enabled: `auth_request` on everything nginx serves except the admin UI, its assets, `/login` and the webhooks, the endpoints below, and an access log that gives each request's principal. Everything includes whatever Satis writes besides `packages.json`, `p2/`, `include/`, `dist/` and the HTML catalogue, such as `p/` with `providers` on, or an archive directory of another name. Outside the image, take the nginx configuration from `docker/nginx/authz-server.conf`, `authz-catalogue.conf` and `authz-http.conf`, and put `authz-catalogue.conf` in every location that serves the output directory, as `docker/nginx.conf` does. nginx has to pass the `Authorization` header, the original URI and the client's address to `verify.php` explicitly, and php-fpm needs APCu.
 
 | Path | What it is |
 |---|---|
 | `/_authzcheck` | A canary that always enforces, whatever the global switch says. Poll it with a valid token |
-| `/_authzpurge` | `POST` with `X-Authz-Admin-Key: <ADMIN_KEY>` to clear the cache at once |
+| `/_authzpurge` | `POST` with `X-Authz-Admin-Key: <ADMIN_KEY>` to clear the cached credentials and grants at once. The dependency graph and the audit summary are kept, and so is anything else in APCu |
 | `/admin/authz` | Principals, tokens, grants and the approval queue, behind Satisfy's admin login |
 
 Turn on `admin.auth` in `parameters.yml` when this plugin is enabled: `/admin/authz` issues tokens.

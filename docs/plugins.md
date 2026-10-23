@@ -32,6 +32,8 @@ A service implementing `Playbloom\Plugin\AdminLinkInterface` adds buttons to the
 | `BuildStartingEvent` | The worker is about to run Satis | `cancel()` the build |
 | `BuildFinishedEvent` | Satis has exited | Read the exit code |
 
+In the image with `authz` enabled, a request for anything but `/admin`, `/login`, `/webhook/` and the admin UI's assets passes the catalogue's check before it reaches PHP, so a plugin's routes belong under `/admin`.
+
 To change `satis.json`, call `Manager::modify()`, which applies a change to the file as it is once the lock is held, or edit the configuration and call `Manager::flush()` with the version it started from.
 
 ## The plugins in this repository
