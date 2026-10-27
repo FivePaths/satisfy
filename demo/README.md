@@ -50,7 +50,7 @@ Satisfy with the [`mcp`](../plugins/Mcp/README.md) and [`diagnosis`](../plugins/
    2. To build it and say how it went. It calls `queue_build`, then `build_status` waiting for the build: it failed.
    3. Why it failed. It reads `last_diagnosis`, which the Symfony AI agent inside Satisfy wrote a few seconds after the build failed: a version constraint Satis cannot parse.
    4. To fix that and build again. It calls `require_package` with a corrected constraint and builds: the build succeeds, and `packages` lists `psr/container` and `psr/log`.
-   5. To also publish `psr/http-message` from `https://github.com/php-fig/http-message.git`. It calls `add_repository`, `require_package` and `queue_build`, and `package` shows its versions.
+   5. To also publish `psr/http-message` from `https://github.com/php-fig/http-message.git`, as a `git` repository like the other two. It calls `add_repository`, `require_package` and `queue_build`, and `package` shows its versions. As `vcs`, Composer would read it through GitHub's API, which allows 60 requests an hour without a token, and a few builds use that up.
 
    Claude Code asks before it calls each tool; a tool that changes `satis.json` says so in its description.
 

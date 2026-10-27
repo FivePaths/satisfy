@@ -40,7 +40,7 @@ final class AddRepository
     public function __invoke(
         #[Schema(description: 'The repository URL, such as https://github.com/php-fig/log.git or git@gitlab.example.com:acme/app.git.')]
         string $url,
-        #[Schema(description: 'The Composer repository type; vcs suits a Git repository on any host.', enum: self::TYPES)]
+        #[Schema(description: 'The Composer repository type. vcs suits a Git repository on any host, but reads one on GitHub through its API, which allows 60 requests an hour without a GitHub token in COMPOSER_AUTH, and then tries to clone over SSH. git clones the URL as given, with no API.', enum: self::TYPES)]
         string $type = 'vcs',
     ): array {
         $this->access->requireWrite();
