@@ -2,6 +2,8 @@
 
 [Satis Composer repository manager](http://getcomposer.org/doc/articles/handling-private-packages-with-satis.md) with a simple web UI.
 
+> **Branch `4.x-mcp`, for the Symfony AI & MCP Hackathon.** Two plugins: [`mcp`](plugins/Mcp/README.md), an MCP server inside Satisfy on Symfony's MCP bundle, and [`diagnosis`](plugins/Diagnosis/README.md), a Symfony AI agent that works out why a build failed. [demo/README.md](demo/README.md) runs both with Docker: from `git clone` to a diagnosis read over MCP.
+
 <p>
   <img src="http://project-satisfy.github.io/satisfy/images/list.png" width="280" height="235" alt="Satis: list composer repositories"/>
   <img src="http://project-satisfy.github.io/satisfy/images/create.png" width="280" height="235" alt="Satis: add a new composer repository"/>
@@ -16,7 +18,7 @@ Satisfy provides:
 * a simple security layer with a login form
 * a webhook endpoints for the most popular version control systems
 * Satis itself
-* optional plugins, enabled with `SATISFY_PLUGINS`: per-token access to the catalogue with per-package grants (`authz`), and a registration gate and publishing on tag for GitLab system hooks (`hookgate`). See [docs/plugins.md](docs/plugins.md), and each plugin's README: [authz](plugins/Authz/README.md), [hookgate](plugins/Hookgate/README.md)
+* optional plugins, enabled with `SATISFY_PLUGINS`: per-token access to the catalogue with per-package grants (`authz`), a registration gate and publishing on tag for GitLab system hooks (`hookgate`), an MCP server for agents (`mcp`), and a diagnosis of failed builds by a model (`diagnosis`). See [docs/plugins.md](docs/plugins.md), and each plugin's README: [authz](plugins/Authz/README.md), [hookgate](plugins/Hookgate/README.md), [mcp](plugins/Mcp/README.md), [diagnosis](plugins/Diagnosis/README.md)
 
 Satisfy ease your satis configuration management. It provides a simple web UI over Satis to avoid a hand-editing of the satis.json configuration file. All repositories from a composer.lock file can also be imported via upload.
 
