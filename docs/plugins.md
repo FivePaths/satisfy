@@ -16,11 +16,14 @@ The plugins in this repository live in `plugins/<Name>/`, extend `Playbloom\Plug
 |---|---|
 | `src/` | The bundle class and the plugin's code, namespace `Playbloom\Plugin\<Name>` |
 | `config/services.yaml` | Loaded only while the plugin is enabled |
+| `config/routes.yaml` | Route imports, such as another bundle's route loader, loaded only while it is enabled |
 | `src/Controller/` | Controllers whose route attributes are loaded only while it is enabled |
 | `templates/` | Twig templates, as `@<Name>/...` |
 | `README.md` | What it does, its configuration, and anything it stores |
 
 A service implementing `Playbloom\Plugin\AdminLinkInterface` adds links to the admin navigation. One implementing `Playbloom\Plugin\AdminPanelInterface` adds a panel to the admin home page's side column, from a template and its context; `authz` uses it to list the sites asking for packages.
+
+A plugin that needs another bundle, such as one it configures in `prependExtension()`, names it in `requiredBundles()`, and that bundle is enabled ahead of it. Symfony takes security firewalls from one configuration file only, which is Satisfy's, so a plugin cannot add a firewall; `mcp` checks its token in a `kernel.request` listener instead.
 
 ### Events
 
@@ -44,5 +47,6 @@ To change `satis.json`, call `Manager::modify()`, which applies a change to the 
 |---|---|
 | [`authz`](../plugins/Authz/README.md) | Per-token access to the catalogue with per-package grants, through nginx's `auth_request`; an approval queue for packages a site asks for and is not granted |
 | [`hookgate`](../plugins/Hookgate/README.md) | For GitLab system hooks: a registration gate that lets the webhook auto-add only real Composer packages, and auto-require, which publishes a package when a tag is pushed to it |
+| [`mcp`](../plugins/Mcp/README.md) | An MCP server at `/admin/mcp`, behind a bearer token, with read-only tools over `satis.json` and the build queue, for agents such as Claude Code |
 
-Each README has the plugin's configuration, what it stores and logs, and how to move to it from the standalone service it replaces.
+Each README has the plugin's configuration, what it stores and logs, and, for `authz` and `hookgate`, how to move to it from the standalone service it replaces.

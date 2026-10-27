@@ -1,0 +1,9 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    Playbloom\Plugin\Mcp\:
+        resource: '../src/'
+        exclude:
+            - '../src/McpServerBundle.php'
