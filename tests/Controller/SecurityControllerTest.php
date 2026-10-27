@@ -39,14 +39,12 @@ class SecurityControllerTest extends WebTestCase
                 '_password' => '',
             ]
         );
-        /** @var RedirectResponse $response */
         $response = $client->getResponse();
         $this->assertInstanceOf(RedirectResponse::class, $response);
         $this->assertTrue($response->isRedirection());
         $this->assertStringEndsWith('/login', $response->getTargetUrl());
 
         $client->submit($form, ['_username' => 'test', '_password' => 'test']);
-        /** @var RedirectResponse $response */
         $response = $client->getResponse();
         $this->assertInstanceOf(RedirectResponse::class, $response);
         $this->assertTrue($response->isRedirection());
