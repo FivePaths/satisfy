@@ -7,7 +7,7 @@
     <h2 class="form-signin-heading">Sign in</h2>
     {% if error %}
     <div class="alert alert-error">
-    {{ error.messageKey }}
+    {{ error.messageKey|replace(error.messageData) }}
     </div>
     {% endif %}
     <div class="form-group">
