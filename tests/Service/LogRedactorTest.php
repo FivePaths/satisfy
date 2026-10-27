@@ -1,9 +1,9 @@
 <?php
 
-namespace Playbloom\Tests\Plugin\Diagnosis;
+namespace Playbloom\Tests\Service;
 
 use PHPUnit\Framework\TestCase;
-use Playbloom\Plugin\Diagnosis\LogRedactor;
+use Playbloom\Service\LogRedactor;
 
 class LogRedactorTest extends TestCase
 {

@@ -1,12 +1,13 @@
 <?php
 
-namespace Playbloom\Plugin\Diagnosis;
+namespace Playbloom\Service;
 
 /**
- * Replaces credentials in a build's log with ***, before the log is kept or
- * sent to a model: user information in URLs, tokens with a known prefix,
- * authentication headers, and the credential sections of COMPOSER_AUTH or an
- * auth.json. Package names, hosts and paths are left as they are.
+ * Replaces credentials in a build's log with ***, wherever the log leaves
+ * Satisfy, whether kept for a diagnosis, sent to a model or returned over MCP:
+ * user information in URLs, tokens with a known prefix, authentication
+ * headers, and the credential sections of COMPOSER_AUTH or an auth.json.
+ * Package names, hosts and paths are left as they are.
  */
 final class LogRedactor
 {

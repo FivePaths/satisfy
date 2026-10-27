@@ -2,8 +2,9 @@
 
 namespace Playbloom\Plugin\Mcp\Security;
 
+use Playbloom\Plugin\Mcp\Access;
 use Playbloom\Plugin\Mcp\McpServerBundle;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Playbloom\Plugin\Mcp\Token\TokenStore;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,8 +13,9 @@ use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
  * Answers 401 to a request for the MCP endpoint unless its Authorization
- * header carries SATISFY_MCP_TOKEN as a bearer token. While no token is set,
- * every request is refused.
+ * header carries one of the tokens in TokenStore, and records which token it
+ * was and its scope on the request, for the tools that write. While no token
+ * has been issued, every request is refused.
  *
  * A listener rather than a firewall: Symfony takes firewalls from one
  * configuration file only, which is Satisfy's, and its firewall signs in by
@@ -21,28 +23,30 @@ use Symfony\Component\HttpKernel\KernelEvents;
  */
 final class BearerTokenListener
 {
-    public function __construct(
-        #[Autowire(env: 'default::SATISFY_MCP_TOKEN')]
-        private readonly ?string $token,
-    ) {
+    public function __construct(private readonly TokenStore $tokens)
+    {
     }
 
     #[AsEventListener(event: KernelEvents::REQUEST, priority: 9)]
     public function onKernelRequest(RequestEvent $event): void
     {
-        $path = $event->getRequest()->getPathInfo();
+        $request = $event->getRequest();
+        $path = $request->getPathInfo();
         if (!$event->isMainRequest() || (McpServerBundle::PATH !== $path && !str_starts_with($path, McpServerBundle::PATH . '/'))) {
             return;
         }
 
-        $header = (string) $event->getRequest()->headers->get('Authorization');
-        $given = preg_match('/^Bearer\s+(\S+)$/i', $header, $match) ? $match[1] : '';
-        if (null !== $this->token && '' !== $this->token && hash_equals($this->token, $given)) {
+        $header = (string) $request->headers->get('Authorization');
+        $token = 1 === preg_match('/^Bearer\s+(\S+)$/i', $header, $match) ? $this->tokens->find($match[1]) : null;
+        if (null !== $token) {
+            $request->attributes->set(Access::ATTRIBUTE, $token);
+            $this->tokens->touch($token['name']);
+
             return;
         }
 
         $event->setResponse(new JsonResponse(
-            ['error' => 'A bearer token is required.'],
+            ['error' => 'A bearer token is required: one issued by bin/console satisfy:mcp-token or at /admin/mcp-tokens.'],
             Response::HTTP_UNAUTHORIZED,
             ['WWW-Authenticate' => 'Bearer realm="Satisfy MCP"'],
         ));

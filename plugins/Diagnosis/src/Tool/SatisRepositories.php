@@ -2,7 +2,7 @@
 
 namespace Playbloom\Plugin\Diagnosis\Tool;
 
-use Playbloom\Plugin\Diagnosis\LogRedactor;
+use Playbloom\Service\LogRedactor;
 use Playbloom\Service\Manager;
 use Symfony\AI\Agent\Toolbox\Attribute\AsTool;
 

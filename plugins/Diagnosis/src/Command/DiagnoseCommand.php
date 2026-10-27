@@ -5,7 +5,7 @@ namespace Playbloom\Plugin\Diagnosis\Command;
 use Playbloom\Plugin\Diagnosis\Diagnoser;
 use Playbloom\Plugin\Diagnosis\DiagnosisConfig;
 use Playbloom\Plugin\Diagnosis\DiagnosisStore;
-use Playbloom\Plugin\Diagnosis\LogRedactor;
+use Playbloom\Service\LogRedactor;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;

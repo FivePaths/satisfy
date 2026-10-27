@@ -48,6 +48,6 @@ To change `satis.json`, call `Manager::modify()`, which applies a change to the 
 | [`authz`](../plugins/Authz/README.md) | Per-token access to the catalogue with per-package grants, through nginx's `auth_request`; an approval queue for packages a site asks for and is not granted |
 | [`diagnosis`](../plugins/Diagnosis/README.md) | When a build fails, asks a model why through Symfony AI's agent, with the log redacted and without `COMPOSER_AUTH`, and keeps the answer; with `mcp`, the newest answer is the resource `satisfy://build/diagnosis` |
 | [`hookgate`](../plugins/Hookgate/README.md) | For GitLab system hooks: a registration gate that lets the webhook auto-add only real Composer packages, and auto-require, which publishes a package when a tag is pushed to it |
-| [`mcp`](../plugins/Mcp/README.md) | An MCP server at `/admin/mcp`, behind a bearer token, with read-only tools over `satis.json` and the build queue, for agents such as Claude Code |
+| [`mcp`](../plugins/Mcp/README.md) | An MCP server at `/admin/mcp` for agents such as Claude Code: read tools over `satis.json`, the catalogue and the builds, and, for a token issued with write scope, tools that change `satis.json` and queue builds. Tokens are managed at `/admin/mcp-tokens` and with `bin/console satisfy:mcp-token` |
 
 Each README has the plugin's configuration, what it stores and logs, and, for `authz` and `hookgate`, how to move to it from the standalone service it replaces.

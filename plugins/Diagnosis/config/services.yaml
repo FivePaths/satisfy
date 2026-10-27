@@ -7,7 +7,6 @@ services:
         resource: '../src/'
         exclude:
             - '../src/DiagnosisBundle.php'
-            - '../src/LogRedactor.php'
             # Made for each diagnosis, around that build's log.
             - '../src/Tool/'
 

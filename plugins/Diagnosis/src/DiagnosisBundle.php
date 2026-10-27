@@ -19,7 +19,7 @@ class DiagnosisBundle extends AbstractPlugin
         if ($builder->hasExtension('mcp')) {
             $builder->prependExtensionConfig('mcp', [
                 'servers' => [
-                    'satisfy' => ['registry' => ['resources' => [__NAMESPACE__ . '\\Mcp\\']]],
+                    'satisfy' => ['registry' => ['tools' => [__NAMESPACE__ . '\\Mcp\\'], 'resources' => [__NAMESPACE__ . '\\Mcp\\']]],
                 ],
             ]);
         }

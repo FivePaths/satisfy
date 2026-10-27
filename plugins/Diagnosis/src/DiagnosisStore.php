@@ -3,6 +3,7 @@
 namespace Playbloom\Plugin\Diagnosis;
 
 use Playbloom\Model\BuildRequest;
+use Playbloom\Service\LogRedactor;
 
 /**
  * One directory per failed build under the diagnosis directory: build.json,

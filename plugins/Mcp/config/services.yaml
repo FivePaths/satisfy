@@ -7,3 +7,12 @@ services:
         resource: '../src/'
         exclude:
             - '../src/McpServerBundle.php'
+
+    Playbloom\Plugin\Mcp\Token\TokenStore:
+        factory: [ Playbloom\Plugin\Mcp\Token\TokenStore, fromEnvironment ]
+        arguments: [ '%kernel.project_dir%' ]
+
+    Playbloom\Plugin\Mcp\Controller\TokenController:
+        public: true
+        tags:
+            - { name: container.service_subscriber }
