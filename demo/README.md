@@ -1,12 +1,12 @@
-# Demo: an MCP server and build diagnosis in Satisfy
+# Demo: Claude Code running a Satisfy through MCP
 
-Satisfy with the [`mcp`](../plugins/Mcp/README.md) and [`diagnosis`](../plugins/Diagnosis/README.md) plugins enabled, and a `satis.json` with a mistake in it. The first build fails, a Symfony AI agent works out why from the redacted build log, and an MCP client reads the answer from Satisfy's MCP server. Fixing the mistake and building again publishes two packages.
+Satisfy with the [`mcp`](../plugins/Mcp/README.md) and [`diagnosis`](../plugins/Diagnosis/README.md) plugins enabled, and a `satis.json` with a mistake in it. From Claude Code, or any MCP client, you ask Satisfy what it publishes, build it, find out why the build failed from the diagnosis a Symfony AI agent inside Satisfy wrote, fix `satis.json`, build again, and add a package: all through Satisfy's MCP server.
 
 ## What you need
 
 - Docker with Compose v2.
-- An MCP client: Claude Code, or the MCP Inspector (`npx @modelcontextprotocol/inspector`, which needs Node.js).
-- A model that can call tools, behind an OpenAI-compatible endpoint. A Hugging Face token works with the settings in `.env.example`: create a fine-grained token at huggingface.co, under Settings, Access Tokens, with "Make calls to Inference Providers" ticked. An Ollama on the same machine should work too, with no key, but has not been tried.
+- Claude Code, or another MCP client such as the MCP Inspector (`npx @modelcontextprotocol/inspector`, which needs Node.js).
+- A model that can call tools, behind an OpenAI-compatible endpoint, for the diagnosis. A Hugging Face token works with the settings in `.env.example`: create a fine-grained token at huggingface.co, under Settings, Access Tokens, with "Make calls to Inference Providers" ticked. An Ollama on the same machine should work too, with no key, but has not been tried.
 
 ## Run it
 
@@ -18,7 +18,7 @@ Satisfy with the [`mcp`](../plugins/Mcp/README.md) and [`diagnosis`](../plugins/
    cp .env.example .env
    ```
 
-   In `.env`, set `SATISFY_MCP_TOKEN` to a random string (`openssl rand -hex 32` makes one) and `SATISFY_DIAGNOSIS_API_KEY` to your Hugging Face token, or switch the model settings to Ollama.
+   In `.env`, set `SATISFY_DIAGNOSIS_API_KEY` to your Hugging Face token, or switch the model settings to Ollama.
 
 2. Start Satisfy:
 
@@ -28,23 +28,35 @@ Satisfy with the [`mcp`](../plugins/Mcp/README.md) and [`diagnosis`](../plugins/
 
    This pulls `ghcr.io/fivepaths/satisfy:4.x-mcp`. `docker compose up -d --build` builds the same image from your checkout instead, which takes a few minutes.
 
-3. Build. Open http://localhost:8000/admin/satis/build and queue a full build. It fails within seconds, and the diagnosis follows a few seconds later.
+3. Issue an MCP token that may change Satisfy. It is printed once:
 
-4. Read the diagnosis over MCP. The server is at `http://localhost:8000/admin/mcp`, and every request carries `Authorization: Bearer <your SATISFY_MCP_TOKEN>`.
+   ```bash
+   docker compose exec -u www-data satisfy bin/console satisfy:mcp-token issue demo --write
+   ```
 
-   - Claude Code:
+   http://localhost:8000/admin/mcp-tokens issues and revokes the same tokens.
 
-     ```bash
-     claude mcp add --transport http satisfy-demo http://localhost:8000/admin/mcp --header "Authorization: Bearer <your SATISFY_MCP_TOKEN>"
-     ```
+4. Connect Claude Code:
 
-     Then, in a new Claude Code session, ask it to read the resource `satisfy://build/diagnosis` and to call the `build_status` tool.
-   - MCP Inspector: run `npx @modelcontextprotocol/inspector`, choose the Streamable HTTP transport, enter the server's URL, and add the `Authorization` header. The diagnosis is under Resources; `repositories` and `build_status` are under Tools.
-   - Without a client, the same JSON is in the container: `docker compose exec satisfy cat var/diagnosis/last.json`.
+   ```bash
+   claude mcp add --transport http satisfy-demo http://localhost:8000/admin/mcp --header "Authorization: Bearer <the token>"
+   ```
 
-5. Fix and build again. Correct the line the diagnosis points to in `demo/config/satis.json`, which the container reads on every build, and queue another build from the same page. It succeeds, and http://localhost:8000 lists `psr/container` and `psr/log`.
+   With the MCP Inspector instead: the Streamable HTTP transport, `http://localhost:8000/admin/mcp`, and the same `Authorization` header.
 
-6. Stop it, and remove its data:
+5. In a new Claude Code session, ask, in your own words:
+
+   1. What Satisfy publishes and what its `satis.json` asks for. It answers with `repositories`, `requirements` and `packages`: nothing is published yet.
+   2. To build it and say how it went. It calls `queue_build`, then `build_status` waiting for the build: it failed.
+   3. Why it failed. It reads `last_diagnosis`, which the Symfony AI agent inside Satisfy wrote a few seconds after the build failed: a version constraint Satis cannot parse.
+   4. To fix that and build again. It calls `require_package` with a corrected constraint and builds: the build succeeds, and `packages` lists `psr/container` and `psr/log`.
+   5. To also publish `psr/http-message` from `https://github.com/php-fig/http-message.git`. It calls `add_repository`, `require_package` and `queue_build`, and `package` shows its versions.
+
+   Claude Code asks before it calls each tool; a tool that changes `satis.json` says so in its description.
+
+6. Look at the catalogue at http://localhost:8000.
+
+7. Stop it, and remove its data, `satis.json` and the token among it:
 
    ```bash
    docker compose down -v
@@ -54,14 +66,14 @@ Satisfy with the [`mcp`](../plugins/Mcp/README.md) and [`diagnosis`](../plugins/
 
 | File | What it holds |
 |---|---|
-| `compose.yaml` | One service: the image, its port, `config/` mounted with `SATIS_CONFIG` pointing into it, and the plugins' settings from `.env` |
+| `compose.yaml` | Satisfy with the two plugins, and a one-off service that copies `config/satis.json` into a volume Satisfy can write |
 | `config/satis.json` | Two public repositories from PHP-FIG, `psr/container` and `psr/log`, and a requirement Satis cannot parse |
-| `.env.example` | The MCP token and the model settings, for Hugging Face, Ollama or OpenRouter |
+| `.env.example` | The port and the model settings, for Hugging Face, Ollama or OpenRouter |
 
-Nothing here needs credentials for the repositories: both are public, and Satis clones them over HTTPS.
+Nothing here needs credentials for the repositories: they are public, and Satis clones them over HTTPS.
 
 ## What to look at
 
-- The diagnosis names the requirement at fault, quotes the lines of the log that show it, and says what to change. It was produced by an agent with three tools over the redacted log and `satis.json`, in a process that had no Composer credentials. Tested with `openai/gpt-oss-120b` on Hugging Face's router, where it answered in a few seconds.
-- The MCP server runs inside Satisfy, from Symfony's MCP bundle, with read-only tools; its token is checked before Satisfy's own firewall.
-- `var/diagnosis/` in the container keeps each failed build's redacted log, the diagnosis, and the output of the process that asked.
+- Two agents. Claude Code works Satisfy through the MCP server, which runs inside Satisfy from Symfony's MCP bundle. When a build fails, a Symfony AI agent inside Satisfy reads the redacted build log with three tools of its own and writes the diagnosis, in a process that has no Composer credentials.
+- The token decides what a client may do: a read token can only look. Every change goes through the same lock on `satis.json` as the admin UI's, and is recorded with the token's name; `docker compose exec satisfy cat var/mcp/audit.jsonl` shows them.
+- A removal that would stop publishing a package sites may still use is refused unless the call says `force`; ask Claude to remove `psr/http-message` again to see it ask you.

@@ -2,7 +2,7 @@
 
 [Satis Composer repository manager](http://getcomposer.org/doc/articles/handling-private-packages-with-satis.md) with a simple web UI.
 
-> **Branch `4.x-mcp`, for the Symfony AI & MCP Hackathon.** Two plugins: [`mcp`](plugins/Mcp/README.md), an MCP server inside Satisfy on Symfony's MCP bundle, and [`diagnosis`](plugins/Diagnosis/README.md), a Symfony AI agent that works out why a build failed. [demo/README.md](demo/README.md) runs both with Docker: from `git clone` to a diagnosis read over MCP.
+> **Branch `4.x-mcp`, for the Symfony AI & MCP Hackathon.** Two plugins: [`mcp`](plugins/Mcp/README.md), an MCP server inside Satisfy on Symfony's MCP bundle, through which an agent reads and changes `satis.json` and runs builds, and [`diagnosis`](plugins/Diagnosis/README.md), a Symfony AI agent that works out why a build failed. [demo/README.md](demo/README.md) runs both with Docker: from `git clone` to Claude Code fixing a failed build and publishing a package.
 
 <p>
   <img src="http://project-satisfy.github.io/satisfy/images/list.png" width="280" height="235" alt="Satis: list composer repositories"/>
