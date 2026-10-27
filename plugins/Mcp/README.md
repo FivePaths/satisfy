@@ -13,6 +13,8 @@ It is served by Symfony's MCP bundle (`symfony/mcp-bundle`, on the official PHP 
 
 Both are read-only. Nothing the plugin exposes writes `satis.json`, queues a build, or touches `authz`.
 
+With the `diagnosis` plugin enabled too, the server also has the resource `satisfy://build/diagnosis`, the newest failed build's diagnosis.
+
 ## Configuration
 
 | Variable | Meaning |

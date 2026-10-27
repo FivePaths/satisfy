@@ -3,6 +3,7 @@
 namespace Playbloom\Plugin;
 
 use Playbloom\Plugin\Authz\AuthzBundle;
+use Playbloom\Plugin\Diagnosis\DiagnosisBundle;
 use Playbloom\Plugin\Hookgate\HookgateBundle;
 use Playbloom\Plugin\Mcp\McpServerBundle;
 use Symfony\Component\HttpKernel\Bundle\BundleInterface;
@@ -18,6 +19,7 @@ final class Plugins
      */
     public const BUILT_IN = [
         'authz' => AuthzBundle::class,
+        'diagnosis' => DiagnosisBundle::class,
         'hookgate' => HookgateBundle::class,
         'mcp' => McpServerBundle::class,
     ];
